@@ -1,0 +1,30 @@
+# Gradle / build outputs
+.gradle/
+build/
+staging/
+run/
+runs/
+out/
+bin/
+mcmodsrepo/
+
+# Generated jars are published to GitHub Releases, not committed.
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+eclipse/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ForgeGradle generated sources
+src/generated/resources/.cache/

@@ -1,0 +1,21 @@
+# Normalize line endings for everything else.
+* text=auto
+
+# Gradle wrapper scripts keep their platform-specific endings.
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+*.bat text eol=crlf
+
+# Text sources
+*.java text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+
+# Binary assets
+*.jar binary
+*.png binary
