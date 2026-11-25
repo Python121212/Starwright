@@ -24,7 +24,7 @@ src/main/resources/META-INF/mods.toml                          ... mod 定義・
 src/main/resources/pack.mcmeta                                 ... リソースパック情報
 src/mockmc/java/                                               ... 擬似マイクラ（フェイク実装一式）
 src/test/java/.../EmulatedForgeLoader.java                     ... 実 Forge ＋ 擬似マイクラで FML を再現
-src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（13 件）
+src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（22 件）
 build.gradle / settings.gradle / gradle.properties             ... ビルド定義（ルート）
 gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 wrapper
 .github/workflows/build-release.yml                          ... GitHub Actions（CI）
@@ -65,7 +65,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 5. 擬似マイクラの `MockMinecraft` に mod を登録し、起動／ログ／登録の記録を回収
 6. ログをキャプチャして `[MockMC] Booting pseudo Minecraft 1.20.1` と `[Starwright] Loaded successfully` を確認
 
-### 検証項目（JUnit 13 件）
+### 検証項目（JUnit 22 件）
 
 | 種別 | 内容 |
 | --- | --- |
@@ -84,7 +84,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 | --- | --- |
 | Forge 1.20.1 (47.2.0) / Gradle 8.1.1 / JDK 17 | ✅ ビルド定義済み |
 | 読み込みだけの jar → GitHub Releases | ✅ `v1.0.0` |
-| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 13 件 |
+| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 22 件 |
 | CI の発火条件 | ✅ jar 入力／本題の変更のみ。ドキュメントのみは無発火 |
 | **mod イベントバスの注入** | ✅ `Starwright(IEventBus)` — FML が本物のバスを渡す |
 | **`net.minecraftforge.*` はすべて本物** | ✅ エミュレータが test classpath の Forge jar から供給（`@Mod` だけでなく `IEventBus` 等も） |
@@ -104,6 +104,19 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 
 > Forge 側のクラス（`DeferredRegister`, `RegistryObject`, `IEventBus` …）はすべて本物が供給されるため、
 > `src/mockmc` に Forge のスタブを置く必要はありません。
+
+## 本題: 宇宙（Space）
+
+仕様・境界・ロードマップは **[docs/SPACE.md](docs/SPACE.md)** にまとめています。
+
+- **Y = 5,000 から宇宙**。そこまで対流圏 → 成層圏 → 中間圏 → 熱圏 → 外気圏と段階的に進み、空が少しずつ暗くなり、見える星が増えていきます
+- **ディメンション読み込みなし**。ネザーのようなテレポート／ロード画面を作らず、同じオーバーワールド内で Y 座標だけでシームレスに移行します
+- **見た目だけにしない**。ステージに応じて無重力などの実際の物理状態が変わります
+- **エリトラでは宇宙へ行けません**（`SpaceTuning.ELYTRA_CUTOFF_Y` 以上で飛行を停止）
+- **地上の描画はクライアント側で完全にカット**する判定を用意。**サーバー側は別**で、地上の tick や判定は止めません
+
+現在は判定ロジック（`space` パッケージ）・サーバー側フック・クライアント側状態・テストまで実装済みです。
+空の描画・星の増加・`LevelRenderer` の描画カットは `docs/SPACE.md` のロードマップどおり次のステップです。
 
 ## 導入
 

@@ -8,9 +8,10 @@ import org.slf4j.Logger;
 /**
  * Starwright - Forge mod for Minecraft 1.20.1.
  *
- * <p>FML injects the mod event bus into the constructor. Content registration
- * (items, blocks, creative tabs, recipes, ...) is intentionally still empty:
- * this class is the prepared foundation for the main development phase.</p>
+ * <p>FML injects the mod event bus into the constructor. The space layer lives
+ * in the {@code space} package and is auto-registered by
+ * {@code @Mod.EventBusSubscriber}; this class stays intentionally thin so the
+ * jar emulator can load it in complete isolation.</p>
  */
 @Mod(Starwright.MOD_ID)
 public class Starwright {
