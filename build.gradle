@@ -133,6 +133,10 @@ publishing {
 // `build` runs `check` -> `test`, so a single ./gradlew build produces the jar
 // and verifies it. The emulation tests read the production jar and the compiled
 // pseudo Minecraft classes, hence the explicit task dependencies.
+//
+// CI invokes this job only when jar inputs (src/main/**, build definition) or the
+// emulation harness change. The exact path filter lives in
+// .github/workflows/build-release.yml; README/docs-only changes never trigger it.
 tasks.named('test', Test).configure {
     useJUnitPlatform()
     dependsOn 'reobfJar', 'mockmcClasses'

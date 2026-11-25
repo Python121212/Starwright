@@ -1,15 +1,46 @@
 name: Build and Release
 
 on:
+  # The jar emulation + tests are MANDATORY only when the jar can change
+  # (mod sources, item/block additions, build definition) or when the emulation
+  # harness itself changes. Everything else - README, .github/**, .gitignore,
+  # .gitattributes, docs - must NOT trigger a build at all.
+  #
+  # Built jars are never committed (they live in GitHub Releases), so "jar was
+  # updated" is expressed as a path filter over everything that produces a jar.
+  #
+  # GitHub does NOT evaluate `paths` for tag pushes, so `v*` tags always run the
+  # full build + emulation tests before the Release is published.
   push:
     branches:
       - main
       - 'arena/**'
+    paths:
+      - 'src/main/**'
+      - 'src/test/**'
+      - 'src/mockmc/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'gradle/wrapper/**'
+      - 'gradlew'
+      - 'gradlew.bat'
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
+    paths:
+      - 'src/main/**'
+      - 'src/test/**'
+      - 'src/mockmc/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'gradle/wrapper/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+  # Manual runs are never automatic; they are an explicit opt-in.
   workflow_dispatch:
 
 permissions:
