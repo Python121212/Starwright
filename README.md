@@ -129,7 +129,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
   **AstroDock のアイテム・船・画面・モデル・ディメンション移動は一切持ち込んでいません**。Y<320 は完全にバニラのままです。
 
 - **空の暗化・星の増加・地上描画の完全カットを実装**。`SpaceSkyRenderer` 1 クラスが空キューブと星を 1 ドローコールで描き、
-  `SpaceLevelRendererMixin` 1 つが `renderChunkLayer` を止めます（refmap／追加依存／テクスチャ／モデル／画面は 0）。
+  `SpaceLevelRendererMixin` 1 つが `renderChunkLayer` を止めます（manifest の `MixinConfigs` で登録。refmap／MixinGradle／追加依存／テクスチャ／モデル／画面は 0）。
   星ジオメトリは 1 回生成、`SpaceState` の更新も 1 ブロック変化時だけに間引いて軽量化しています。
 
 判定ロジック・サーバー側フック・連続昇降・描画・テストまで実装済みです。

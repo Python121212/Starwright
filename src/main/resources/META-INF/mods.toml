@@ -25,6 +25,5 @@ versionRange="${minecraft_version_range}"
 ordering="NONE"
 side="BOTH"
 
-# One client-only mixin: cancels terrain chunk rendering above the ground-render cut-off.
-[[mixins]]
-config="starwright.mixins.json"
+# The client-only mixin is registered through the jar manifest's
+# MixinConfigs attribute (Forge 1.20.1). No mixin table belongs here.

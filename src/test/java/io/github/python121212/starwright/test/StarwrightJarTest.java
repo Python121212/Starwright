@@ -422,7 +422,12 @@ class StarwrightJarTest {
         assertTrue(mixins.contains("\"client\""), "the mixin must be client-only");
         assertFalse(mixins.contains("refmap"),
                 "no refmap is needed: remap=false with the literal SRG name");
-        assertTrue(readEntry("META-INF/mods.toml").contains("[[mixins]]"));
+        // Forge 1.20.1 reads MixinConfigs from the jar manifest, not mods.toml.
+        String manifest = readEntry("META-INF/MANIFEST.MF");
+        assertTrue(manifest.contains("MixinConfigs: starwright.mixins.json"),
+                "the production jar must register its mixin config in the manifest");
+        assertFalse(readEntry("META-INF/mods.toml").contains("[[mixins]]"),
+                "mods.toml [[mixins]] is a NeoForge-only key on Forge 1.20.1");
 
         String pool = new String(readClassBytes(
                         "io/github/python121212/starwright/space/client/mixin/"

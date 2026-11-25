@@ -149,6 +149,9 @@ AstroDock の `SkyLayer` / `AtmosphereClient` を参考にしつつ、**1 クラ
 
 Mixin は SRG 名をリテラルで書き `remap = false, require = 0` にしたため **refmap が不要**です。
 開発環境（official 名）では `require = 0` で無視され、本番の reobf 済み jar で確実に適用されます。
+**登録は Forge 1.20.1 の標準どおり jar manifest の `MixinConfigs: starwright.mixins.json`** です。
+（`mods.toml` の `[[mixins]]` は NeoForge 側のキーで、Forge 1.20.1 の `ModFileInfo` は読みません。）
+このため MixinGradle プラグインも追加依存も必要ありません。
 
 ## ✅ Step 5: Y=5,000 への連続昇降手段
 
