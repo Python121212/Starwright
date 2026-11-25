@@ -313,9 +313,13 @@ class StarwrightJarTest {
         String rulesPool = new String(readClassBytes(
                         "io/github/python121212/starwright/space/SpaceAscentRules.class"),
                 StandardCharsets.ISO_8859_1);
-        assertTrue(rulesPool.contains("SpaceTuning"));
-        assertTrue(rulesPool.contains("targetSpeed"));
-        assertTrue(rulesPool.contains("stepTowards"));
+        // javac inlines SpaceTuning's static final primitive constants, so the
+        // compiled rules class has NO SpaceTuning reference - that is expected.
+        // The production constants are verified via AscentEmulation instead.
+        assertTrue(rulesPool.contains("targetSpeed"),
+                "SpaceAscentRules must expose targetSpeed in the production jar");
+        assertTrue(rulesPool.contains("stepTowards"),
+                "SpaceAscentRules must expose stepTowards in the production jar");
         assertFalse(rulesPool.contains("net/minecraft"),
                 "ascent rules must not reference Minecraft classes (reobf-safe)");
         assertFalse(rulesPool.contains("net/minecraftforge"),
@@ -324,10 +328,14 @@ class StarwrightJarTest {
         String hooksPool = new String(readClassBytes(
                         "io/github/python121212/starwright/space/SpaceForgeHooks.class"),
                 StandardCharsets.ISO_8859_1);
-        assertTrue(hooksPool.contains("SpaceAscentRules"));
-        assertTrue(hooksPool.contains("isArmed"));
-        assertTrue(hooksPool.contains("targetSpeed"));
-        assertTrue(hooksPool.contains("stepTowards"));
+        assertTrue(hooksPool.contains("SpaceAscentRules"),
+                "the server hook must delegate to SpaceAscentRules");
+        assertTrue(hooksPool.contains("isArmed"),
+                "the hook must guard the vanilla build limit");
+        assertTrue(hooksPool.contains("targetSpeed"),
+                "the hook must ask the rules for a target velocity");
+        assertTrue(hooksPool.contains("stepTowards"),
+                "the hook must smooth the velocity every tick");
         assertFalse(hooksPool.contains("net/minecraft/server/level/ServerLevel"),
                 "the hook must never create a ServerLevel or change dimension");
 
