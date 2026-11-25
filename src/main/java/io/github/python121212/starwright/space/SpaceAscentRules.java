@@ -17,9 +17,10 @@ package io.github.python121212.starwright.space;
  * at most one metre per tick - there is no teleport, no {@code setPos}, no
  * {@code changeDimension} and no loading screen.</p>
  *
- * <p>Controls use vanilla input that the server already receives, so no item,
- * block, key binding or network packet is added: hold jump to rise, hold sneak
- * to descend, release both to hold altitude.</p>
+ * <p>No item, block, key binding, network packet or access transformer is added.
+ * Once the player crosses the vanilla build limit the same Overworld simply
+ * carries them upward; holding vanilla sneak descends; arriving in space stops
+ * the climb so the player floats in zero gravity.</p>
  */
 public final class SpaceAscentRules {
 
@@ -37,15 +38,22 @@ public final class SpaceAscentRules {
     /**
      * Desired vertical velocity in metres per tick.
      *
-     * @param jump        vanilla jump input held (server-synced by the game)
-     * @param sneak       vanilla sneak input held
+     * @param sneak       vanilla sneak input held (server-synced by the game)
      * @param fallFlying  true while elytra flight is active; never boosted
      */
-    public static double targetSpeed(double y, boolean jump, boolean sneak, boolean fallFlying) {
-        if (!isArmed(y) || fallFlying || jump == sneak) {
+    public static double targetSpeed(double y, boolean sneak, boolean fallFlying) {
+        if (!isArmed(y) || fallFlying) {
             return 0.0;
         }
-        return jump ? SpaceTuning.ASCENT_MAX_SPEED : -SpaceTuning.ASCENT_MAX_SPEED;
+        // Descending stays available even from inside space.
+        if (sneak) {
+            return -SpaceTuning.ASCENT_MAX_SPEED;
+        }
+        // Arrival: stop climbing and float in the zero-gravity state.
+        if (isSpace(y)) {
+            return 0.0;
+        }
+        return SpaceTuning.ASCENT_MAX_SPEED;
     }
 
     /**
@@ -74,5 +82,9 @@ public final class SpaceAscentRules {
         if (speed > limit) return limit;
         if (speed < -limit) return -limit;
         return speed;
+    }
+
+    private static boolean isSpace(double y) {
+        return y >= SpaceTuning.SPACE_START_Y;
     }
 }

@@ -77,7 +77,7 @@ public final class SpaceForgeHooks {
 
         Vec3 motion = player.getDeltaMovement();
         double target = SpaceAscentRules.targetSpeed(
-                y, player.jumping, player.isShiftKeyDown(), player.isFallFlying());
+                y, player.isShiftKeyDown(), player.isFallFlying());
         double vertical = SpaceAscentRules.stepTowards(motion.y, target);
 
         // Velocity only. The vanilla entity tick performs the actual move next.

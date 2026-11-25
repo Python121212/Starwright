@@ -35,27 +35,32 @@ class SpaceAscentRulesTest {
     @DisplayName("below the build limit nothing is changed - vanilla stays vanilla")
     void belowBuildLimitNothingChanges() {
         for (double y : new double[] {-64, 0, 100, 319, 319.999}) {
-            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, true, false, false), EPS);
-            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, true, false), EPS);
+            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, false), EPS);
+            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, true, false), EPS);
+            assertEquals(0.0, SpaceAscentRules.stepTowards(0.0,
+                    SpaceAscentRules.targetSpeed(y, false, false)), EPS);
         }
-        assertTrue(SpaceAscentRules.targetSpeed(320, true, false, false) > 0.0);
+        assertTrue(SpaceAscentRules.targetSpeed(320, false, false) > 0.0);
     }
 
     @Test
-    @DisplayName("jump rises, sneak descends, both/neither holds altitude")
-    void vanillaInputsSelectDirection() {
+    @DisplayName("continuous climb, sneak descent, and automatic stop on arrival in space")
+    void climbDescentAndArrivalBehaviour() {
         double max = SpaceTuning.ASCENT_MAX_SPEED;
-        assertEquals(max, SpaceAscentRules.targetSpeed(400, true, false, false), EPS);
-        assertEquals(-max, SpaceAscentRules.targetSpeed(400, false, true, false), EPS);
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(400, true, true, false), EPS);
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(400, false, false, false), EPS);
+        assertEquals(max, SpaceAscentRules.targetSpeed(400, false, false), EPS);
+        assertEquals(-max, SpaceAscentRules.targetSpeed(400, true, false), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(5_000, false, false), EPS,
+                "reaching space must stop the climb so the player floats");
+        assertEquals(-max, SpaceAscentRules.targetSpeed(5_000, true, false), EPS,
+                "sneak must still allow descending out of space");
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(319, false, false), EPS);
     }
 
     @Test
     @DisplayName("elytra flight never receives an ascent boost")
     void elytraNeverGetsAnAscentBoost() {
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(400, true, false, true), EPS);
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(4_000, false, true, true), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(400, false, true), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(4_000, true, true), EPS);
         assertFalse(SpaceRules.isElytraAllowed(5_000));
     }
 
@@ -100,7 +105,7 @@ class SpaceAscentRulesTest {
         seen.add(SpaceRules.stageForY(y));
 
         while (y < SpaceTuning.SPACE_START_Y && ticks < 50_000) {
-            double target = SpaceAscentRules.targetSpeed(y, true, false, false);
+            double target = SpaceAscentRules.targetSpeed(y, false, false);
             velocity = SpaceAscentRules.stepTowards(velocity, target);
             y += velocity;
 
@@ -135,7 +140,7 @@ class SpaceAscentRulesTest {
         int ticks = 0;
 
         while (y > SpaceTuning.ASCENT_ARM_Y + 1.0 && ticks < 50_000) {
-            double target = SpaceAscentRules.targetSpeed(y, false, true, false);
+            double target = SpaceAscentRules.targetSpeed(y, true, false);
             velocity = SpaceAscentRules.stepTowards(velocity, target);
             y += velocity;
             assertTrue(Math.abs(velocity) <= SpaceTuning.ASCENT_MAX_SPEED + EPS);

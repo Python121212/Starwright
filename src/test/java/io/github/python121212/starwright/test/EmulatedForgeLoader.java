@@ -206,7 +206,7 @@ public final class EmulatedForgeLoader {
         Class<?> rules = loader.loadClass(ASCENT_RULES_CLASS);
         Method isArmed = rules.getMethod("isArmed", double.class);
         Method targetSpeed = rules.getMethod("targetSpeed",
-                double.class, boolean.class, boolean.class, boolean.class);
+                double.class, boolean.class, boolean.class);
         Method stepTowards = rules.getMethod("stepTowards", double.class, double.class);
         Method recordAscent = mockmc.getMethod("recordAscent", double.class, double.class);
 
@@ -221,11 +221,11 @@ public final class EmulatedForgeLoader {
         List<Double> trace = new ArrayList<>();
         trace.add(y);
 
-        // Hold jump: rise continuously until the real Y=5,000 boundary.
+        // Beyond the build limit: rise continuously until the real Y=5,000 boundary.
         while (y < spaceStartY && ascentTicks < MAX_EMULATED_TICKS) {
             boolean armed = (boolean) isArmed.invoke(null, y);
             double target = armed
-                    ? (double) targetSpeed.invoke(null, y, true, false, false)
+                    ? (double) targetSpeed.invoke(null, y, false, false)
                     : 0.0;
             velocity = (double) stepTowards.invoke(null, velocity, target);
             y += velocity; // the pseudo game applies the vanilla entity move
@@ -245,7 +245,7 @@ public final class EmulatedForgeLoader {
         while (y > armY + 1.0 && descentTicks < MAX_EMULATED_TICKS) {
             boolean armed = (boolean) isArmed.invoke(null, y);
             double target = armed
-                    ? (double) targetSpeed.invoke(null, y, false, true, false)
+                    ? (double) targetSpeed.invoke(null, y, true, false)
                     : 0.0;
             velocity = (double) stepTowards.invoke(null, velocity, target);
             y += velocity;
