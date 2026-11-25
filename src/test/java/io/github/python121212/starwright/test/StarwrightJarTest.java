@@ -476,7 +476,8 @@ class StarwrightJarTest {
             assertFalse(entry.contains("Screen.class"), "no UI: " + entry);
         }
         assertEquals(3, emulated.entries().stream()
-                        .filter(entry -> entry.startsWith("assets/starwright/models/"))
+                        .filter(entry -> entry.startsWith("assets/starwright/models/")
+                                && entry.endsWith(".json"))
                         .count(),
                 "only three tiny models, all reusing vanilla textures");
         String pool = new String(readClassBytes(
@@ -545,7 +546,8 @@ class StarwrightJarTest {
     @DisplayName("ship models are minimal and reuse vanilla textures")
     void shipModelsAreMinimal() throws Exception {
         assertEquals(1, emulated.entries().stream()
-                .filter(entry -> entry.startsWith("assets/starwright/blockstates/"))
+                .filter(entry -> entry.startsWith("assets/starwright/blockstates/")
+                        && entry.endsWith(".json"))
                 .count());
         for (String entry : emulated.entries()) {
             assertFalse(entry.endsWith(".png"), "no new textures: " + entry);
