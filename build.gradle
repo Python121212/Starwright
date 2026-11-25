@@ -17,6 +17,9 @@ base {
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 minecraft {
+    // AstroDock の成功例と同じ方式。バニラの搭乗入力パケットが持つ jumping を
+    // public にするだけで、追加の通信・アイテム無しに上昇入力を読める。
+    accessTransformer = file("src/main/resources/META-INF/accesstransformer.cfg")
     mappings channel: mapping_channel, version: mapping_version
     copyIdeResources = true
 

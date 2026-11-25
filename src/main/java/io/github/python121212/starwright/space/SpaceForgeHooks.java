@@ -2,9 +2,12 @@ package io.github.python121212.starwright.space;
 
 import com.mojang.logging.LogUtils;
 import io.github.python121212.starwright.Starwright;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.player.Abilities;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.ForgeMod;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -30,6 +33,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * its vertical velocity from the jump/sneak inputs inside {@code travel()}, so
  * writing the velocity afterwards would be overwritten.</p>
  *
+ * <p>Learned from AstroDock (method of reaching space only): the vanilla
+ * player-input packet already carries the held jump state. An access transformer
+ * exposes {@code LivingEntity.jumping}, so no item, key binding, custom packet
+ * or screen is needed. Gravity is weakened gradually with a real
+ * {@code ForgeMod.ENTITY_GRAVITY} attribute modifier instead of being a
+ * cosmetic number.</p>
+ *
  * <p>Survival / Adventure support: those game modes have {@code mayfly = false},
  * so vanilla's anti-flying check would kick the player after hovering above the
  * build limit. While the ascent is armed we temporarily grant flight ability and
@@ -41,6 +51,9 @@ public final class SpaceForgeHooks {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static volatile SpaceStage lastLoggedStage = null;
+
+    private static final UUID GRAVITY_MODIFIER =
+            UUID.fromString("6b1f2c0a-4d9e-4f58-9c3b-7a2e5d810f46");
 
     /** Original vanilla flight abilities, keyed by player, restored below Y=320. */
     private static final Map<UUID, OriginalFlight> ORIGINAL_FLIGHT = new ConcurrentHashMap<>();
@@ -77,8 +90,8 @@ public final class SpaceForgeHooks {
             player.stopFallFlying();
         }
 
-        // 「宇宙は見た目ではない」: actually change a physical state.
-        player.setNoGravity(state.isSpace());
+        // 「宇宙は見た目ではない」: real gravity physics, not a cosmetic value.
+        applyGravity(player, y, state);
 
         // Seamless, continuous ascent/descent. No teleport, no dimension load.
         applyContinuousAscent(player, y, creativeFlying);
@@ -90,6 +103,35 @@ public final class SpaceForgeHooks {
                     String.format("%.2f", state.darkness()),
                     String.format("%.2f", state.starVisibility()),
                     String.format("%.2f", state.gravityScale()));
+        }
+    }
+
+    /**
+     * Weakens gravity smoothly with a real entity attribute multiplier while
+     * climbing, then switches to full zero gravity inside space. Rounded to
+     * 0.01 so an altitude change does not send an attribute packet every tick.
+     */
+    private static void applyGravity(Player player, double y, SpaceState state) {
+        player.setNoGravity(state.isSpace());
+        if (state.isSpace()) {
+            return;
+        }
+        AttributeInstance attribute = player.getAttribute(ForgeMod.ENTITY_GRAVITY.get());
+        if (attribute == null) {
+            return;
+        }
+        double amount = Math.round((SpaceRules.gravityScale(y) - 1.0) * 100.0) / 100.0;
+        AttributeModifier old = attribute.getModifier(GRAVITY_MODIFIER);
+        if (old != null && old.getAmount() == amount) {
+            return;
+        }
+        if (old != null) {
+            attribute.removeModifier(GRAVITY_MODIFIER);
+        }
+        if (amount != 0.0) {
+            attribute.addTransientModifier(new AttributeModifier(
+                    GRAVITY_MODIFIER, "Starwright space gravity", amount,
+                    AttributeModifier.Operation.MULTIPLY_TOTAL));
         }
     }
 
@@ -133,7 +175,8 @@ public final class SpaceForgeHooks {
 
         Vec3 motion = player.getDeltaMovement();
         double target = SpaceAscentRules.targetSpeed(
-                y, player.isShiftKeyDown(), player.isFallFlying(), creativeFlying);
+                y, player.isShiftKeyDown(), player.isFallFlying(),
+                creativeFlying, player.jumping);
         double vertical = SpaceAscentRules.stepTowards(motion.y, target);
 
         // Velocity only. Vanilla's travel()/move() performs the actual move.

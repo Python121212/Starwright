@@ -17,11 +17,12 @@ package io.github.python121212.starwright.space;
  * at most one metre per tick - there is no teleport, no {@code setPos}, no
  * {@code changeDimension} and no loading screen.</p>
  *
- * <p>No item, block, key binding, network packet or access transformer is added.
- * Once the player crosses the vanilla build limit the same Overworld simply
- * carries them upward; holding vanilla sneak descends. Creative flight keeps
- * working at every altitude (including inside space), so a creative player can
- * simply fly up through the sky.</p>
+ * <p>HOW TO REACH SPACE (learned from AstroDock, without its item or UI): the
+ * vanilla player-input packet already carries the held jump state. An access
+ * transformer exposes {@code LivingEntity.jumping}, so holding jump is the
+ * ascent input and holding sneak is the descent input. No item, no key binding,
+ * no custom packet and no screen is added. Creative flight keeps climbing even
+ * with no input; other modes settle into zero gravity when they let go.</p>
  */
 public final class SpaceAscentRules {
 
@@ -41,23 +42,29 @@ public final class SpaceAscentRules {
      *
      * @param sneak          vanilla sneak input held (server-synced by the game)
      * @param fallFlying     true while elytra flight is active; never boosted
-     * @param creativeFlying true while the player is in creative flight
+     * @param creativeFlying true while the player is in ORIGINAL creative flight
+     * @param jumpHeld       vanilla jump input, exposed by the access transformer
      */
     public static double targetSpeed(double y, boolean sneak, boolean fallFlying,
-                                     boolean creativeFlying) {
+                                     boolean creativeFlying, boolean jumpHeld) {
         if (!isArmed(y) || fallFlying) {
             return 0.0;
         }
-        // Descending stays available even from inside space.
+        // Descending stays available at every altitude, including inside space.
         if (sneak) {
             return -SpaceTuning.ASCENT_MAX_SPEED;
         }
-        // Non-creative arrival settles into zero gravity. Creative flight keeps
-        // flying: the player may keep climbing freely from inside space.
-        if (isSpace(y) && !creativeFlying) {
-            return 0.0;
+        // Holding jump climbs. This replaces AstroDock's FlightCapsule item:
+        // the vanilla input packet already carries this state on the server.
+        if (jumpHeld) {
+            return SpaceTuning.ASCENT_MAX_SPEED;
         }
-        return SpaceTuning.ASCENT_MAX_SPEED;
+        // Creative flight keeps flying with no input, even inside space.
+        if (creativeFlying) {
+            return SpaceTuning.ASCENT_MAX_SPEED;
+        }
+        // Survival / Adventure let go (or arrive): settle into zero gravity.
+        return 0.0;
     }
 
     /**
@@ -99,9 +106,5 @@ public final class SpaceAscentRules {
         if (speed > limit) return limit;
         if (speed < -limit) return -limit;
         return speed;
-    }
-
-    private static boolean isSpace(double y) {
-        return y >= SpaceTuning.SPACE_START_Y;
     }
 }

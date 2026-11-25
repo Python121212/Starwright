@@ -24,7 +24,7 @@ src/main/resources/META-INF/mods.toml                          ... mod 定義・
 src/main/resources/pack.mcmeta                                 ... リソースパック情報
 src/mockmc/java/                                               ... 擬似マイクラ（フェイク実装一式）
 src/test/java/.../EmulatedForgeLoader.java                     ... 実 Forge ＋ 擬似マイクラで FML を再現
-src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（40 件）
+src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（45 件）
 build.gradle / settings.gradle / gradle.properties             ... ビルド定義（ルート）
 gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 wrapper
 .github/workflows/build-release.yml                          ... GitHub Actions（CI）
@@ -65,7 +65,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 5. 擬似マイクラの `MockMinecraft` に mod を登録し、起動／ログ／登録の記録を回収
 6. ログをキャプチャして `[MockMC] Booting pseudo Minecraft 1.20.1` と `[Starwright] Loaded successfully` を確認
 
-### 検証項目（JUnit 40 件）
+### 検証項目（JUnit 45 件）
 
 | 種別 | 内容 |
 | --- | --- |
@@ -84,7 +84,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 | --- | --- |
 | Forge 1.20.1 (47.2.0) / Gradle 8.1.1 / JDK 17 | ✅ ビルド定義済み |
 | 読み込みだけの jar → GitHub Releases | ✅ `v1.0.0` |
-| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 40 件 |
+| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 45 件 |
 | CI の発火条件 | ✅ jar 入力／本題の変更のみ。ドキュメントのみは無発火 |
 | **mod イベントバスの注入** | ✅ `Starwright(IEventBus)` — FML が本物のバスを渡す |
 | **`net.minecraftforge.*` はすべて本物** | ✅ エミュレータが test classpath の Forge jar から供給（`@Mod` だけでなく `IEventBus` 等も） |
@@ -116,14 +116,17 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 - **地上の描画はクライアント側で完全にカット**する判定を用意。**サーバー側は別**で、地上の tick や判定は止めません
 - **建築限界はバニラのまま**（Y = −64〜319 を変更しない）。`dimension_type` の上書きやディメンション追加は行わず、Y = 5,000 は建築限界の外側にあるエンティティ座標として扱います
 
-- **Y=5,000 への連続昇降を実装**。建築限界の 1 つ上 (Y=320) を超えると自動的に連続上昇し、
-  スニーク長押しで下降、**Y=5,000 到達で自動停止**（無重力で浮く）します。
+- **Y=5,000 への連続昇降を実装**。建築限界の 1 つ上 (Y=320) から **ジャンプ長押しで上昇**、スニーク長押しで下降、
+  ジャンプを離すと停止します（非クリエは Y=5,000 到達で自動停止 → 無重力で浮く）。
+  上昇入力は [AstroDock](https://github.com/Python121212/AstroDock/tree/arena%2Ff49e2986-astrodock) の成功例にならい、
+  `LivingEntity.jumping` を 1 行の Access Transformer で公開して**バニラの搭乗入力パケットから読む**だけ（アイテム・独自通信・UI 不要）。
+  **重力は `ForgeMod.ENTITY_GRAVITY` の属性で段階的に弱める** actual physics です。
   **クリエイティブ飛行なら宇宙到達後も飛び続けられます**（`getAbilities().flying` を検出）。
   **サバイバル／アドベンチャーも対応**: `mayfly = false` による vanilla の浮遊 kick を避けるため、
   Y≥320 の間だけ飛行許可を一時付与し、元の値を退避して Y<320 で復元します（ゲームモードは不変）。
   フックは `Phase.START` で動くため、クリエ飛行が `Player#travel()` で速度を作り直しても上書きされません。
   テレポート／`setPos`／ディメンション移動は一切使わず、毎 tick `setDeltaMovement` で速度だけを与えます（最高 1.0 m/tick、約 4 分で到達）。
-  アイテム・ブロック・キー登録の追加はありません。Y<320 は完全にバニラのままです。
+  **AstroDock のアイテム・船・画面・モデル・ディメンション移動は一切持ち込んでいません**。Y<320 は完全にバニラのままです。
 
 判定ロジック（`space` パッケージ）・サーバー側フック・クライアント側状態・連続昇降・テストまで実装済みです。
 空の描画・星の増加・`LevelRenderer` の描画カットは `docs/SPACE.md` のロードマップどおり次のステップです。

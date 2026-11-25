@@ -20,6 +20,8 @@ class SpaceAscentRulesTest {
     private static final double EPS = 1e-9;
     private static final boolean NOT_CREATIVE = false;
     private static final boolean CREATIVE = true;
+    private static final boolean JUMP_HELD = true;
+    private static final boolean NO_JUMP = false;
 
     @Test
     @DisplayName("ascent arms exactly one block above the vanilla build limit")
@@ -37,48 +39,71 @@ class SpaceAscentRulesTest {
     @DisplayName("below the build limit nothing is changed - creative flight stays vanilla")
     void belowBuildLimitNothingChanges() {
         for (double y : new double[] {-64, 0, 100, 319, 319.999}) {
-            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, false, NOT_CREATIVE), EPS);
-            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, true, false, NOT_CREATIVE), EPS);
-            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, false, CREATIVE), EPS);
+            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, false, NOT_CREATIVE, JUMP_HELD), EPS);
+            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, true, false, NOT_CREATIVE, NO_JUMP), EPS);
+            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, false, CREATIVE, JUMP_HELD), EPS);
             assertEquals(0.0, SpaceAscentRules.stepTowards(0.0,
-                    SpaceAscentRules.targetSpeed(y, false, false, CREATIVE)), EPS);
+                    SpaceAscentRules.targetSpeed(y, false, false, CREATIVE, JUMP_HELD)), EPS);
         }
-        assertTrue(SpaceAscentRules.targetSpeed(320, false, false, CREATIVE) > 0.0);
+        assertTrue(SpaceAscentRules.targetSpeed(320, false, false, CREATIVE, JUMP_HELD) > 0.0);
     }
 
     @Test
-    @DisplayName("continuous climb, sneak descent, and automatic stop on arrival in space")
-    void climbDescentAndArrivalBehaviour() {
+    @DisplayName("jump climbs, sneak descends, releasing the input settles into space")
+    void inputDrivenClimbSneakDescentAndArrival() {
         double max = SpaceTuning.ASCENT_MAX_SPEED;
-        assertEquals(max, SpaceAscentRules.targetSpeed(400, false, false, NOT_CREATIVE), EPS);
-        assertEquals(-max, SpaceAscentRules.targetSpeed(400, true, false, NOT_CREATIVE), EPS);
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(5_000, false, false, NOT_CREATIVE), EPS,
+        assertEquals(max, SpaceAscentRules.targetSpeed(400, false, false, NOT_CREATIVE, JUMP_HELD), EPS);
+        assertEquals(-max, SpaceAscentRules.targetSpeed(400, true, false, NOT_CREATIVE, NO_JUMP), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(5_000, false, false, NOT_CREATIVE, NO_JUMP), EPS,
                 "reaching space must stop the climb so the player floats");
-        assertEquals(-max, SpaceAscentRules.targetSpeed(5_000, true, false, NOT_CREATIVE), EPS,
+        assertEquals(-max, SpaceAscentRules.targetSpeed(5_000, true, false, NOT_CREATIVE, NO_JUMP), EPS,
                 "sneak must still allow descending out of space");
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(319, false, false, NOT_CREATIVE), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(319, false, false, NOT_CREATIVE, JUMP_HELD), EPS);
+    }
+
+    @Test
+    @DisplayName("the vanilla jump input is the ascent control (no item, no packet)")
+    void jumpInputIsTheAscentControl() {
+        double max = SpaceTuning.ASCENT_MAX_SPEED;
+        for (double y : new double[] {320, 800, 2_000, 4_200, 4_999}) {
+            assertEquals(max, SpaceAscentRules.targetSpeed(y, false, false, NOT_CREATIVE, JUMP_HELD), EPS,
+                    "holding jump must climb at Y=" + y);
+            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, false, NOT_CREATIVE, NO_JUMP), EPS,
+                    "releasing jump must stop at Y=" + y);
+        }
+        assertTrue(SpaceAscentRules.targetSpeed(800, false, false, CREATIVE, NO_JUMP) > 0.0,
+                "creative flight keeps climbing without any input");
     }
 
     @Test
     @DisplayName("creative flight keeps climbing freely from inside space")
     void creativeFlightKeepsWorkingInSpace() {
         double max = SpaceTuning.ASCENT_MAX_SPEED;
-        assertEquals(max, SpaceAscentRules.targetSpeed(5_000, false, false, CREATIVE), EPS,
+        assertEquals(max, SpaceAscentRules.targetSpeed(5_000, false, false, CREATIVE, NO_JUMP), EPS,
                 "creative flight must not be cut off at the space boundary");
-        assertEquals(max, SpaceAscentRules.targetSpeed(9_000, false, false, CREATIVE), EPS);
-        assertEquals(-max, SpaceAscentRules.targetSpeed(9_000, true, false, CREATIVE), EPS,
+        assertEquals(max, SpaceAscentRules.targetSpeed(9_000, false, false, CREATIVE, NO_JUMP), EPS);
+        assertEquals(-max, SpaceAscentRules.targetSpeed(9_000, true, false, CREATIVE, NO_JUMP), EPS,
                 "sneak still descends while creatively flying");
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(5_000, false, false, NOT_CREATIVE), EPS,
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(5_000, false, false, NOT_CREATIVE, NO_JUMP), EPS,
                 "non-creative arrival still settles into zero gravity");
         assertTrue(SpaceAscentRules.isArmed(9_000));
     }
 
     @Test
+    @DisplayName("jump still climbs inside space, but releasing it stops non-creative players")
+    void releasingJumpInSpaceStopsOnlyNonCreative() {
+        double max = SpaceTuning.ASCENT_MAX_SPEED;
+        assertEquals(max, SpaceAscentRules.targetSpeed(5_000, false, false, NOT_CREATIVE, JUMP_HELD), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(5_000, false, false, NOT_CREATIVE, NO_JUMP), EPS);
+        assertEquals(max, SpaceAscentRules.targetSpeed(5_000, false, false, CREATIVE, NO_JUMP), EPS);
+    }
+
+    @Test
     @DisplayName("elytra flight never receives an ascent boost")
     void elytraNeverGetsAnAscentBoost() {
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(400, false, true, NOT_CREATIVE), EPS);
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(4_000, true, true, NOT_CREATIVE), EPS);
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(4_000, false, true, CREATIVE), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(400, false, true, NOT_CREATIVE, JUMP_HELD), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(4_000, true, true, NOT_CREATIVE, NO_JUMP), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(4_000, false, true, CREATIVE, JUMP_HELD), EPS);
         assertFalse(SpaceRules.isElytraAllowed(5_000));
     }
 
@@ -113,7 +138,7 @@ class SpaceAscentRulesTest {
     }
 
     @Test
-    @DisplayName("the full climb to space is continuous and passes every stage")
+    @DisplayName("holding jump all the way to space is continuous and passes every stage")
     void trajectoryToSpaceIsContinuous() {
         double y = SpaceTuning.ASCENT_ARM_Y;
         double velocity = 0.0;
@@ -123,7 +148,7 @@ class SpaceAscentRulesTest {
         seen.add(SpaceRules.stageForY(y));
 
         while (y < SpaceTuning.SPACE_START_Y && ticks < 50_000) {
-            double target = SpaceAscentRules.targetSpeed(y, false, false, NOT_CREATIVE);
+            double target = SpaceAscentRules.targetSpeed(y, false, false, NOT_CREATIVE, JUMP_HELD);
             velocity = SpaceAscentRules.stepTowards(velocity, target);
             y += velocity;
 
@@ -158,7 +183,7 @@ class SpaceAscentRulesTest {
         int ticks = 0;
 
         while (y > SpaceTuning.ASCENT_ARM_Y + 1.0 && ticks < 50_000) {
-            double target = SpaceAscentRules.targetSpeed(y, true, false, NOT_CREATIVE);
+            double target = SpaceAscentRules.targetSpeed(y, true, false, NOT_CREATIVE, NO_JUMP);
             velocity = SpaceAscentRules.stepTowards(velocity, target);
             y += velocity;
             assertTrue(Math.abs(velocity) <= SpaceTuning.ASCENT_MAX_SPEED + EPS);
@@ -180,7 +205,6 @@ class SpaceAscentRulesTest {
         assertTrue(SpaceAscentRules.needsTemporaryFlightPermission(5_000.0, false));
         assertFalse(SpaceAscentRules.needsTemporaryFlightPermission(319.0, false));
         assertFalse(SpaceAscentRules.needsTemporaryFlightPermission(0.0, false));
-        // Creative / Spectator already have flight and are never touched.
         assertFalse(SpaceAscentRules.needsTemporaryFlightPermission(5_000.0, true));
     }
 

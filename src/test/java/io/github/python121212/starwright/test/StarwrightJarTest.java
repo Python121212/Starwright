@@ -342,6 +342,12 @@ class StarwrightJarTest {
                 "the hook must run at Phase.START so creative flight cannot overwrite it");
         assertTrue(hooksPool.contains("needsTemporaryFlightPermission"),
                 "the hook must consult the Survival / Adventure permission rule");
+        assertTrue(hooksPool.contains("f_20899_"),
+                "the hook must read the AT-exposed vanilla jump input");
+        assertTrue(hooksPool.contains("ENTITY_GRAVITY"),
+                "gravity must be applied as a real Forge attribute modifier");
+        assertTrue(hooksPool.contains("gravityScale"),
+                "the existing gravityScale curve must actually be used");
         assertFalse(hooksPool.contains("net/minecraft/server/level/ServerLevel"),
                 "the hook must never create a ServerLevel or change dimension");
 
@@ -370,5 +376,38 @@ class StarwrightJarTest {
     void survivalAndAdventureAreGrantedFlightPermission() {
         assertTrue(emulated.ascent().survivalNeedsFlightPermission(),
                 "Survival / Adventure must not be kicked by the vanilla anti-flying check");
+    }
+
+    @Test
+    @DisplayName("access transformer exposes the vanilla jump input, without an item or UI")
+    void accessTransformerExposesVanillaJumpInput() throws Exception {
+        assertTrue(emulated.entries().contains("META-INF/accesstransformer.cfg"),
+                "the production jar must ship the access transformer");
+        String at = readEntry("META-INF/accesstransformer.cfg");
+        assertTrue(at.contains("public net.minecraft.world.entity.LivingEntity f_20899_"),
+                "AstroDock's proven SRG name for LivingEntity.jumping is required");
+        assertTrue(at.contains("# jumping"));
+    }
+
+    @Test
+    @DisplayName("production jar uses the vanilla jump input as the ascent control")
+    void jumpInputDrivesTheAscentInProductionJar() {
+        EmulatedForgeLoader.AscentEmulation ascent = emulated.ascent();
+        assertEquals(ascent.maxSpeed(), ascent.jumpHeldSpeed(), 1e-9,
+                "holding jump must climb");
+        assertEquals(0.0, ascent.idleSpeedWithoutJump(), 1e-9,
+                "releasing jump must stop - no automatic ascent for Survival / Adventure");
+    }
+
+    @Test
+    @DisplayName("no AstroDock items, screens, ships or models were copied in")
+    void noItemsOrUiWereCopiedIn() {
+        for (String entry : emulated.entries()) {
+            assertFalse(entry.contains("Screen.class"), "no UI: " + entry);
+            assertFalse(entry.contains("flight_capsule"), "no capsule item: " + entry);
+            assertFalse(entry.contains("Ship.class"), "no ship entity: " + entry);
+            assertFalse(entry.startsWith("assets/starwright/models/"), "no item/block models: " + entry);
+            assertFalse(entry.startsWith("data/"), "no dimension overrides: " + entry);
+        }
     }
 }

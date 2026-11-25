@@ -63,6 +63,8 @@ public final class EmulatedForgeLoader {
             boolean descentReversed,
             double creativeSpeedInSpace,
             boolean survivalNeedsFlightPermission,
+            double jumpHeldSpeed,
+            double idleSpeedWithoutJump,
             List<Double> ascentTrace) {}
 
     /** Outcome of one emulated discovery + instantiation + ascent pass. */
@@ -208,7 +210,7 @@ public final class EmulatedForgeLoader {
         Class<?> rules = loader.loadClass(ASCENT_RULES_CLASS);
         Method isArmed = rules.getMethod("isArmed", double.class);
         Method targetSpeed = rules.getMethod("targetSpeed",
-                double.class, boolean.class, boolean.class, boolean.class);
+                double.class, boolean.class, boolean.class, boolean.class, boolean.class);
         Method stepTowards = rules.getMethod("stepTowards", double.class, double.class);
         Method needsFlight = rules.getMethod("needsTemporaryFlightPermission",
                 double.class, boolean.class);
@@ -229,7 +231,7 @@ public final class EmulatedForgeLoader {
         while (y < spaceStartY && ascentTicks < MAX_EMULATED_TICKS) {
             boolean armed = (boolean) isArmed.invoke(null, y);
             double target = armed
-                    ? (double) targetSpeed.invoke(null, y, false, false, false)
+                    ? (double) targetSpeed.invoke(null, y, false, false, false, true)
                     : 0.0;
             velocity = (double) stepTowards.invoke(null, velocity, target);
             y += velocity; // the pseudo game applies the vanilla entity move
@@ -249,7 +251,7 @@ public final class EmulatedForgeLoader {
         while (y > armY + 1.0 && descentTicks < MAX_EMULATED_TICKS) {
             boolean armed = (boolean) isArmed.invoke(null, y);
             double target = armed
-                    ? (double) targetSpeed.invoke(null, y, true, false, false)
+                    ? (double) targetSpeed.invoke(null, y, true, false, false, false)
                     : 0.0;
             velocity = (double) stepTowards.invoke(null, velocity, target);
             y += velocity;
@@ -259,12 +261,18 @@ public final class EmulatedForgeLoader {
             recordAscent.invoke(null, y, velocity);
         }
 
-        // Creative flight must still return a climb speed from INSIDE space.
+        // Creative flight must still return a climb speed from INSIDE space,
+        // even with no jump input (AstroDock-style input-driven ascent).
         double creativeSpeedInSpace = (double) targetSpeed.invoke(
-                null, spaceStartY + 100.0, false, false, true);
+                null, spaceStartY + 100.0, false, false, true, false);
         // Survival / Adventure (mayfly = false) must be granted flight above Y=320.
         boolean survivalNeedsFlightPermission = (boolean) needsFlight.invoke(
                 null, armY + 100.0, false);
+        // The vanilla jump input is the ascent control; releasing it stops.
+        double jumpHeldSpeed = (double) targetSpeed.invoke(
+                null, armY + 100.0, false, false, false, true);
+        double idleSpeedWithoutJump = (double) targetSpeed.invoke(
+                null, armY + 100.0, false, false, false, false);
 
         return new AscentEmulation(
                 armY, spaceY, y,
@@ -273,6 +281,7 @@ public final class EmulatedForgeLoader {
                 maxAscentStep, maxDescentStep,
                 monotonicAscent, descentReversed,
                 creativeSpeedInSpace, survivalNeedsFlightPermission,
+                jumpHeldSpeed, idleSpeedWithoutJump,
                 List.copyOf(trace));
     }
 
