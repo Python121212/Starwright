@@ -79,8 +79,9 @@ jobs:
       - name: Summarize emulation tests
         if: always()
         run: |
-          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
           import glob
+          import sys
           import xml.etree.ElementTree as ET
 
           files = sorted(glob.glob("build/test-results/test/TEST-*.xml"))
@@ -95,8 +96,20 @@ jobs:
                   for key in totals:
                       totals[key] += int(root.get(key, "0"))
                   for case in root.findall("testcase"):
-                      bad = case.find("failure") is not None or case.find("error") is not None
-                      cases.append((bad, case.get("classname", ""), case.get("name", "")))
+                      node = case.find("failure")
+                      if node is None:
+                          node = case.find("error")
+                      bad = node is not None
+                      cls = case.get("classname", "")
+                      name = case.get("name", "")
+                      cases.append((bad, cls, name))
+                      if bad:
+                          detail = (node.get("message") or node.text or "").strip()
+                          first = detail.splitlines()[0][:300] if detail else "(no message)"
+                          # Surface the reason as a run annotation. Actions log /
+                          # artifact blobs are not reachable from the sandbox, so
+                          # the JUnit XML must be reduced to an annotation here.
+                          print(f"::error file={path}::{cls} / {name}: {first}", file=sys.stderr)
               ok = totals["failures"] == 0 and totals["errors"] == 0
               print(f"**{'passed' if ok else 'FAILED'}**\n")
               print("| tests | failures | errors | skipped |")
