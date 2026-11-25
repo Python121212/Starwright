@@ -14,9 +14,10 @@ import net.minecraftforge.fml.common.Mod;
  * {@link io.github.python121212.starwright.space.SpaceForgeHooks}: the server
  * keeps ticking the ground normally while the client may stop DRAWING it.
  *
- * <p>Renderers read {@link #current()} - sky darkening, star count and the
- * ground-render cut-off are applied from here in the next implementation steps
- * (see docs/SPACE.md).</p>
+ * <p>Renderers read {@link #current()} once per frame. To keep the client light,
+ * the snapshot is rebuilt only when the altitude changed by at least one block
+ * instead of allocating a new {@link SpaceState} twenty times per second while
+ * the player is standing still.</p>
  */
 @Mod.EventBusSubscriber(
         modid = Starwright.MOD_ID,
@@ -25,6 +26,7 @@ import net.minecraftforge.fml.common.Mod;
 public final class SpaceClientState {
 
     private static volatile SpaceState current = SpaceRules.stateAt(0.0, false);
+    private static volatile double lastY = Double.NaN;
 
     private SpaceClientState() {}
 
@@ -37,7 +39,14 @@ public final class SpaceClientState {
         if (mc.player == null) {
             return;
         }
-        current = SpaceRules.stateAt(mc.player.getY(), false);
+        double y = mc.player.getY();
+        // NaN on the first tick guarantees an initial snapshot. A <1 block
+        // change cannot alter the stage, so skip the allocation entirely.
+        if (Math.abs(y - lastY) < 1.0) {
+            return;
+        }
+        lastY = y;
+        current = SpaceRules.stateAt(y, false);
     }
 
     public static SpaceState current() {

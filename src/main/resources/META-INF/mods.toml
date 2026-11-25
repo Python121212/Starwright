@@ -24,3 +24,7 @@ mandatory=true
 versionRange="${minecraft_version_range}"
 ordering="NONE"
 side="BOTH"
+
+# One client-only mixin: cancels terrain chunk rendering above the ground-render cut-off.
+[[mixins]]
+config="starwright.mixins.json"

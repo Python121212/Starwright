@@ -24,7 +24,7 @@ src/main/resources/META-INF/mods.toml                          ... mod 定義・
 src/main/resources/pack.mcmeta                                 ... リソースパック情報
 src/mockmc/java/                                               ... 擬似マイクラ（フェイク実装一式）
 src/test/java/.../EmulatedForgeLoader.java                     ... 実 Forge ＋ 擬似マイクラで FML を再現
-src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（45 件）
+src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（54 件）
 build.gradle / settings.gradle / gradle.properties             ... ビルド定義（ルート）
 gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 wrapper
 .github/workflows/build-release.yml                          ... GitHub Actions（CI）
@@ -65,7 +65,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 5. 擬似マイクラの `MockMinecraft` に mod を登録し、起動／ログ／登録の記録を回収
 6. ログをキャプチャして `[MockMC] Booting pseudo Minecraft 1.20.1` と `[Starwright] Loaded successfully` を確認
 
-### 検証項目（JUnit 45 件）
+### 検証項目（JUnit 54 件）
 
 | 種別 | 内容 |
 | --- | --- |
@@ -84,7 +84,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 | --- | --- |
 | Forge 1.20.1 (47.2.0) / Gradle 8.1.1 / JDK 17 | ✅ ビルド定義済み |
 | 読み込みだけの jar → GitHub Releases | ✅ `v1.0.0` |
-| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 45 件 |
+| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 54 件 |
 | CI の発火条件 | ✅ jar 入力／本題の変更のみ。ドキュメントのみは無発火 |
 | **mod イベントバスの注入** | ✅ `Starwright(IEventBus)` — FML が本物のバスを渡す |
 | **`net.minecraftforge.*` はすべて本物** | ✅ エミュレータが test classpath の Forge jar から供給（`@Mod` だけでなく `IEventBus` 等も） |
@@ -128,8 +128,12 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
   テレポート／`setPos`／ディメンション移動は一切使わず、毎 tick `setDeltaMovement` で速度だけを与えます（最高 1.0 m/tick、約 4 分で到達）。
   **AstroDock のアイテム・船・画面・モデル・ディメンション移動は一切持ち込んでいません**。Y<320 は完全にバニラのままです。
 
-判定ロジック（`space` パッケージ）・サーバー側フック・クライアント側状態・連続昇降・テストまで実装済みです。
-空の描画・星の増加・`LevelRenderer` の描画カットは `docs/SPACE.md` のロードマップどおり次のステップです。
+- **空の暗化・星の増加・地上描画の完全カットを実装**。`SpaceSkyRenderer` 1 クラスが空キューブと星を 1 ドローコールで描き、
+  `SpaceLevelRendererMixin` 1 つが `renderChunkLayer` を止めます（refmap／追加依存／テクスチャ／モデル／画面は 0）。
+  星ジオメトリは 1 回生成、`SpaceState` の更新も 1 ブロック変化時だけに間引いて軽量化しています。
+
+判定ロジック・サーバー側フック・連続昇降・描画・テストまで実装済みです。
+残るは Step 6（酸素・気圧・モブスポーン抑制など）のみです。詳細は [docs/SPACE.md](docs/SPACE.md)。
 
 ## 導入
 

@@ -3,6 +3,7 @@ package io.github.python121212.starwright.test;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.moandjiezana.toml.Toml;
+import io.github.python121212.starwright.space.SpaceRenderRules;
 import io.github.python121212.starwright.space.SpaceTuning;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -409,5 +410,72 @@ class StarwrightJarTest {
             assertFalse(entry.startsWith("assets/starwright/models/"), "no item/block models: " + entry);
             assertFalse(entry.startsWith("data/"), "no dimension overrides: " + entry);
         }
+    }
+
+    @Test
+    @DisplayName("one refmap-free mixin cancels terrain chunk rendering")
+    void mixinCancelsTerrainRendering() throws Exception {
+        assertTrue(emulated.entries().contains("starwright.mixins.json"),
+                "the production jar must ship the mixin config");
+        String mixins = readEntry("starwright.mixins.json");
+        assertTrue(mixins.contains("SpaceLevelRendererMixin"));
+        assertTrue(mixins.contains("\"client\""), "the mixin must be client-only");
+        assertFalse(mixins.contains("refmap"),
+                "no refmap is needed: remap=false with the literal SRG name");
+        assertTrue(readEntry("META-INF/mods.toml").contains("[[mixins]]"));
+
+        String pool = new String(readClassBytes(
+                        "io/github/python121212/starwright/space/client/mixin/"
+                                + "SpaceLevelRendererMixin.class"),
+                StandardCharsets.ISO_8859_1);
+        assertTrue(pool.contains("m_172993_"),
+                "m_172993_ is Forge 1.20.1's SRG name for renderChunkLayer");
+        assertTrue(pool.contains("skipGroundRendering"),
+                "the mixin must consult the client-side cut-off");
+        assertTrue(pool.contains("cancel"), "the injector must cancel the call");
+    }
+
+    @Test
+    @DisplayName("production jar sky rules darken, add stars and cut the ground")
+    void productionJarRenderingRulesArePureAndGradual() {
+        EmulatedForgeLoader.RenderEmulation render = emulated.render();
+        assertEquals(SpaceRenderRules.STAR_COUNT, render.starCount());
+        assertEquals(0, render.starsAtGround());
+        assertEquals(SpaceRenderRules.STAR_COUNT, render.starsAtSpace());
+        assertTrue(render.starsAt1000() > 0 && render.starsAt1000() < render.starCount(),
+                "stars must appear gradually, not all at once");
+        assertTrue(render.monotonicStars(), "visible stars must never decrease");
+        assertEquals(0x659be2, render.skyColorAtGround());
+        assertEquals(0x000000, render.skyColorAtSpace());
+        assertEquals(1.0, render.fogAtGround(), 1e-9);
+        assertEquals(0.0, render.fogAtSpace(), 1e-9);
+        assertFalse(render.skipGroundAtGround());
+        assertTrue(render.skipGroundAtSpace());
+    }
+
+    @Test
+    @DisplayName("rendering is lightweight: one renderer, one mixin, no assets")
+    void renderingIsLightweight() throws Exception {
+        long renderers = emulated.entries().stream()
+                .filter(entry -> entry.endsWith("Renderer.class") && entry.contains("/space/"))
+                .count();
+        assertEquals(1, renderers, "only SpaceSkyRenderer may render");
+        long mixins = emulated.entries().stream()
+                .filter(entry -> entry.endsWith("Mixin.class"))
+                .count();
+        assertEquals(1, mixins, "only one mixin");
+        for (String entry : emulated.entries()) {
+            assertFalse(entry.endsWith(".refmap.json"), "no refmap: " + entry);
+            assertFalse(entry.endsWith(".png"), "no textures: " + entry);
+            assertFalse(entry.startsWith("assets/starwright/models/"), "no models: " + entry);
+            assertFalse(entry.contains("Screen.class"), "no UI: " + entry);
+        }
+        String pool = new String(readClassBytes(
+                        "io/github/python121212/starwright/space/SpaceRenderRules.class"),
+                StandardCharsets.ISO_8859_1);
+        assertFalse(pool.contains("net/minecraft"),
+                "SpaceRenderRules must stay pure Java");
+        assertFalse(pool.contains("net/minecraftforge"),
+                "SpaceRenderRules must stay emulator-safe");
     }
 }

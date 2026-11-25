@@ -67,6 +67,20 @@ public final class EmulatedForgeLoader {
             double idleSpeedWithoutJump,
             List<Double> ascentTrace) {}
 
+    /** Outcome of loading the production jar's pure rendering rules. */
+    public record RenderEmulation(
+            int starCount,
+            int starsAtGround,
+            int starsAt1000,
+            int starsAtSpace,
+            boolean monotonicStars,
+            int skyColorAtGround,
+            int skyColorAtSpace,
+            double fogAtGround,
+            double fogAtSpace,
+            boolean skipGroundAtGround,
+            boolean skipGroundAtSpace) {}
+
     /** Outcome of one emulated discovery + instantiation + ascent pass. */
     public record Result(
             String modId,
@@ -80,7 +94,8 @@ public final class EmulatedForgeLoader {
             List<String> loadedMods,
             List<String> entries,
             List<String> constructorParameterTypes,
-            AscentEmulation ascent) {}
+            AscentEmulation ascent,
+            RenderEmulation render) {}
 
     private static final String MOD_ANNOTATION = "net.minecraftforge.fml.common.Mod";
     private static final String MAIN_CLASS = "io.github.python121212.starwright.Starwright";
@@ -160,6 +175,8 @@ public final class EmulatedForgeLoader {
 
             // Emulate the real server ticks that carry the player to space.
             AscentEmulation ascent = runAscentEmulation(loader, mockmc);
+            // Load the client sky rules straight from the production jar.
+            RenderEmulation render = runRenderEmulation(loader);
 
             boolean bootstrapped = (boolean) mockmc.getMethod("isBootstrapped").invoke(null);
             List<String> events = copyStrings(mockmc.getMethod("events").invoke(null));
@@ -174,6 +191,9 @@ public final class EmulatedForgeLoader {
                     + ", max step " + String.format("%.2f", ascent.maxAscentStep())
                     + " m/tick, descended back to Y=" + String.format("%.1f", ascent.returnY())
                     + " in " + ascent.descentTicks() + " ticks");
+            original.println("[emulated FML] sky: darkness 0 -> 1, stars "
+                    + render.starsAtGround() + " -> " + render.starsAtSpace()
+                    + ", ground rendered=" + !render.skipGroundAtSpace());
 
             return new Result(
                     modId,
@@ -187,7 +207,8 @@ public final class EmulatedForgeLoader {
                     loaded,
                     List.copyOf(loader.jarEntries()),
                     paramTypes,
-                    ascent);
+                    ascent,
+                    render);
         } finally {
             loader.closeJar();
         }
@@ -283,6 +304,56 @@ public final class EmulatedForgeLoader {
                 creativeSpeedInSpace, survivalNeedsFlightPermission,
                 jumpHeldSpeed, idleSpeedWithoutJump,
                 List.copyOf(trace));
+    }
+
+    /**
+     * Loads {@code SpaceRenderRules} and {@code SpaceRules} from the PRODUCTION
+     * jar and evaluates the sky/star/fog curves across the whole climb. These
+     * are Minecraft-independent, so no pseudo client renderer is required.
+     */
+    private static RenderEmulation runRenderEmulation(
+            ForgeBackedLoader loader) throws Exception {
+
+        Class<?> rules = loader.loadClass(
+                "io.github.python121212.starwright.space.SpaceRenderRules");
+        Class<?> spaceRules = loader.loadClass(
+                "io.github.python121212.starwright.space.SpaceRules");
+        Method visibleStars = rules.getMethod("visibleStars", double.class);
+        Method skyColor = rules.getMethod("skyColor", double.class);
+        Method fogFactor = rules.getMethod("fogFactor", double.class);
+        Method skipGround = rules.getMethod("skipGround", double.class);
+        Method starVisibility = spaceRules.getMethod("starVisibility", double.class);
+        Method darkness = spaceRules.getMethod("darkness", double.class);
+        int starCount = rules.getField("STAR_COUNT").getInt(null);
+
+        double v0 = (double) starVisibility.invoke(null, 0.0);
+        double v1000 = (double) starVisibility.invoke(null, 1_000.0);
+        double v5000 = (double) starVisibility.invoke(null, 5_000.0);
+        int starsAtGround = (int) visibleStars.invoke(null, v0);
+        int starsAt1000 = (int) visibleStars.invoke(null, v1000);
+        int starsAtSpace = (int) visibleStars.invoke(null, v5000);
+
+        boolean monotonicStars = true;
+        int previous = -1;
+        for (int y = 0; y <= 5_000; y += 250) {
+            double v = (double) starVisibility.invoke(null, (double) y);
+            int now = (int) visibleStars.invoke(null, v);
+            if (now < previous) monotonicStars = false;
+            previous = now;
+        }
+
+        double d0 = (double) darkness.invoke(null, 0.0);
+        double d5000 = (double) darkness.invoke(null, 5_000.0);
+        return new RenderEmulation(
+                starCount,
+                starsAtGround, starsAt1000, starsAtSpace,
+                monotonicStars,
+                (int) skyColor.invoke(null, d0),
+                (int) skyColor.invoke(null, d5000),
+                (double) fogFactor.invoke(null, d0),
+                (double) fogFactor.invoke(null, d5000),
+                (boolean) skipGround.invoke(null, 0.0),
+                (boolean) skipGround.invoke(null, 5_000.0));
     }
 
     private static void assertTrue(boolean condition, String message) {

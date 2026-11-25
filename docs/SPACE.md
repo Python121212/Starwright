@@ -51,7 +51,7 @@ gravityScale    = 1 - 0.95 * t // 宇宙でも 0 にはしない
 | --- | --- | --- |
 | クラス | `SpaceClientState`（`Dist.CLIENT`） | `SpaceForgeHooks`（`!isClientSide`） |
 | 役割 | `darkness` / `starVisibility` / `skipGroundRendering` を保持 | ステージ判定・エリトラ停止・無重力・ステージ変化ログ |
-| 地上 | **描画を止める**（適用は Step 4） | **止めない**。チャンク tick・当たり判定・他プレイヤーを維持 |
+| 地上 | **描画を完全停止**（Mixin が `renderChunkLayer` を cancel） | **止めない**。チャンク tick・当たり判定・他プレイヤーを維持 |
 
 `SpaceForgeHooks` と `SpaceClientState` は `@Mod.EventBusSubscriber` で FML が自動登録するため、
 `Starwright` 本体はこれらを一切参照しません。これにより jar エミュレータは従来どおり
@@ -62,15 +62,14 @@ gravityScale    = 1 - 0.95 * t // 宇宙でも 0 にはしない
 | Step | 内容 | 状態 |
 | --- | --- | --- |
 | 1 | ステージ判定・設定・エリトラ禁止・無重力・クライアント状態・テスト | ✅ **今回** |
-| 2 | 空を段階的に暗くする（`FogEvents` / `RegisterDimensionSpecialEffectsEvent`） | ⏳ |
-| 3 | 見える星を増やす（`DimensionSpecialEffects#renderSky` の差し替え） | ⏳ |
-| 4 | 地上描画の完全カット（`LevelRenderer` Mixin ＋ refmap） | ⏳ |
-| 5 | Y=5,000 への**連続移動**手段（建築限界バニラ維持） | ✅ **今回** |
+| 2 | 空を段階的に暗くする（`ComputeFogColor` ＋ `AFTER_SKY` の空キューブ） | ✅ **今回** |
+| 3 | 見える星を増やす（固定シード 240 クアッドを段階的に描画） | ✅ **今回** |
+| 4 | 地上描画の完全カット（`renderChunkLayer` を Mixin 1 つで cancel。refmap 不要） | ✅ **今回** |
+| 5 | Y=5,000 への**連続移動**手段（建築限界バニラ維持） | ✅ 実装済み |
 | 6 | 酸素・気圧・モブスポーン抑制・音の減衰など | ⏳ |
 
-Step 2〜4 はクライアント描画に深入りするため、Mixin あるいは Forge の
-クライアント拡張ポイントの追加が必要です。判定側は完成しているので、
-描画側を足すだけの状態です。Step 5 は今回実装しました（下記）。
+**Step 2〜4 は今回まとめて実装**し、あわせて描画まわりの軽量化も行いました（下記）。
+Step 5 も実装済みです。残るは Step 6 のみです。
 
 ## ✅ 決定事項（ユーザー承認）
 
@@ -125,6 +124,31 @@ Step 2〜4 はクライアント描画に深入りするため、Mixin あるい
 浮遊判定は今回の Step 5 で対処済み（サバイバル／アドベンチャーは一時的に飛行許可を付与）。
 `Entity#checkOutOfWorld()` は下方向のみなので高高度では発火しません。
 酸素・気圧・モブスポーン抑制などは Step 6 のままです。
+
+## ✅ Step 2〜4: 空・星・地上描画カットと軽量化
+
+AstroDock の `SkyLayer` / `AtmosphereClient` を参考にしつつ、**1 クラス＋Mixin 1 つ**に集約しました。
+
+| Step | 実装 | 根拠 |
+| --- | --- | --- |
+| 2 空の暗化 | `ViewportEvent.ComputeFogColor` でフォグを暗転＋`RenderLevelStageEvent(AFTER_SKY)` で空キューブを 1 ドローコール描画。色は `SpaceRenderRules.skyColor(darkness)` で青 `0x659be2` → 黒 | `darkness = sqrt(t)` をそのまま色補間に使う |
+| 3 星の増加 | 固定シードの **240 クアッドをクラスロード時に 1 回だけ生成**。毎フレームは `visibleStars(starVisibility)` 個だけ描く | `starVisibility = t^1.8`。地上 0 個 → 宇宙 240 個 |
+| 4 地上描画カット | `SpaceLevelRendererMixin` が `LevelRenderer#renderChunkLayer`（SRG `m_172993_`）を **HEAD で cancel**。空は生きるので Step 2/3 と両立 | `SpaceClientState.skipGroundRendering()` が Y≥4,200 または宇宙で true |
+
+### 軽量化の中身
+
+| 項目 | 効果 |
+| --- | --- |
+| **地形描画** | `renderChunkLayer` の呼び出し自体を止める（チャンクが無い高高度での無駄なレイヤー処理もゼロ） |
+| **星ジオメトリ** | 240 クアッドを 1 回生成するだけ。毎フレームの再生成・星エンティティ・テクスチャは **0** |
+| **ドローコール** | 空キューブ＋星を `BufferBuilder` 1 本 / `BufferUploader` 1 回に統合 |
+| **`SpaceState`** | 高度が **1 ブロック以上**変わったときだけ再生成。静止中の 20 回/秒のアロケーションを削減 |
+| **地上付近** | `darkness == 0` ならフォグも空も即 return。バニラ描画に一切触らない |
+| **追加物** | 描画クラス 1、`client` Mixin 1、`mixins.json` 1。`refmap` / MixinGradle / 追加依存 / テクスチャ / モデル / 画面は **0** |
+| **サーバー** | 描画カットはクライアントのみ。サーバーは地上チャンクを従来どおり tick し続ける |
+
+Mixin は SRG 名をリテラルで書き `remap = false, require = 0` にしたため **refmap が不要**です。
+開発環境（official 名）では `require = 0` で無視され、本番の reobf 済み jar で確実に適用されます。
 
 ## ✅ Step 5: Y=5,000 への連続昇降手段
 
@@ -199,13 +223,16 @@ Step 2〜4 はクライアント描画に深入りするため、Mixin あるい
 - `SpaceAscentRulesTest.java`（13 件）: 開始高度 320、**ジャンプ長押しが上昇入力**、ジャンプを離すと停止、
   **クリエ飛行は宇宙でも上昇継続**、**サバイバル／アドベンチャーの一時飛行許可と復元**、
   エリトラ無ブースト、速度クランプ、加速度上限、**Y=5,000 までの連続軌跡と全ステージ通過**、下降
-- `StarwrightJarTest.java`（22 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
+- `SpaceRenderRulesTest.java`（6 件）: 星の単調増加、空の青→黒、フォグ減衰、地上カット境界、
+  星が暗さより遅れて現れること、範囲外/NaN のクランプ
+- `StarwrightJarTest.java`（25 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
   **本番 jar の連続昇降エミュレーション**、**ジャンプ入力が上昇を駆動すること**、
   **Access Transformer の内容**、**本番 jar のクリエ飛行が宇宙でも上昇を返すこと**、
   **本番 jar がサバイバル／アドベンチャーに飛行許可を与えること**、
   **アイテム／画面／船／モデルが混入していないこと**、`Phase.START`・重力属性・AT フィールド参照、
   一時飛行許可ルールへの委譲、擬似ゲームの全 tick 記録、
-  `SpaceAscentRules` が Minecraft 非依存であること、`ServerLevel` 参照が jar 全体に無いこと
+  **Mixin の SRG 名と refmap 不在**、**本番 jar の空・星・フォグ曲線**、**1 renderer / 1 mixin / assets 0 の軽量構成**、
+  `SpaceAscentRules` と `SpaceRenderRules` が Minecraft 非依存であること、`ServerLevel` 参照が jar 全体に無いこと
 
-合計 **45 件**。`src/main` / `build.gradle` / `src/test` を触っているため、
+合計 **54 件**。`src/main` / `src/test` を触っているため、
 前回決めた CI の発火条件どおり **ビルド＋エミュレーションテストが必ず走ります**。
