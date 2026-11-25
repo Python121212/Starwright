@@ -83,13 +83,28 @@ Minecraft 1.20.1 + Forge 47.x をインストールし、Releases からダウ�
 
 ## CI / リリース（GitHub Actions）
 
-`.github/workflows/build-release.yml` が以下を自動で行います。
+### いつ走るか
+
+**エミュレーション＋テストは、jar が更新される変更（アイテム追加などを含む）のときに必ず走り、それ以外では一切走りません。**
+
+jar はリポジトリにコミットしないため、「jar が更新された」は `.github/workflows/build-release.yml` の
+`on.push.paths` / `on.pull_request.paths` で判定します（**いずれか**のファイルが触られれば発火）。
+
+| 変更内容 | CI |
+| --- | --- |
+| `src/main/**` — mod 本体、**アイテム・ブロック追加など** | ✅ **必ず実行** |
+| `build.gradle` / `settings.gradle` / `gradle.properties` / `gradlew*` / `gradle/wrapper/**` — jar の作り方 | ✅ **必ず実行** |
+| `src/test/**` / `src/mockmc/**` — エミュレータ・擬似マイクラ・テスト自体の変更 | ✅ **必ず実行** |
+| `v*` タグの push | ✅ **必ず実行**。GitHub はタグ push に `paths` を適用しないため、Release 公開前に必ず検証される |
+| `README.md` / `.github/**` / `.gitignore` / `.gitattributes` / ドキュメント**のみ** | ❌ **一切実行しない**（workflow run すら作られない） |
+| `workflow_dispatch` | 自動ではなく、手動で明示的に起こした場合のみ |
+
+### 実行内容
 
 | 契機 | 動作 |
 | --- | --- |
-| `main` / `arena/**` への push、PR | JDK 17 で `./gradlew build`（**jar 生成 ＋ エミュレーションテスト**）を実行。jar と JUnit レポートを artifact に保存し、テスト結果をジョブサマリーに表示 |
+| 上記いずれかの変更を含む `main` / `arena/**` への push、PR | JDK 17 で `./gradlew build`（**jar 生成 ＋ エミュレーションテスト**）。jar と JUnit レポートを artifact に保存し、テスト結果をジョブサマリーに表示 |
 | `v*` タグの push | 上記に加えて **GitHub Release を作成し、jar を添付** |
-| `workflow_dispatch` | 手動実行 |
 
 リリースを出す手順:
 
