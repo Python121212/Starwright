@@ -29,6 +29,7 @@ class StarwrightJarTest {
 
     private static final String MOD_ID = "starwright";
     private static final String MOD_ANNOTATION = "net.minecraftforge.fml.common.Mod";
+    private static final String EVENT_BUS = "net.minecraftforge.eventbus.api.IEventBus";
     private static Path jar;
     private static EmulatedForgeLoader.Result emulated;
 
@@ -175,11 +176,20 @@ class StarwrightJarTest {
     }
 
     @Test
+    @DisplayName("FML injects the real Forge mod event bus")
+    void constructorReceivesForgeEventBus() {
+        assertEquals(List.of(EVENT_BUS), emulated.constructorParameterTypes(),
+                "Starwright should take the Forge mod event bus");
+        assertNotNull(emulated.instance(), "construction with the injected bus must succeed");
+    }
+
+    @Test
     @DisplayName("the REAL Forge @Mod annotation is used, not a stub")
     void usesRealForgeAnnotation() throws Exception {
         Class<?> real = Class.forName(MOD_ANNOTATION);
         assertTrue(real.isAnnotation());
         assertNotNull(real.getDeclaredMethod("value"));
+        assertNotNull(Class.forName(EVENT_BUS), "real Forge event bus must be on the classpath");
 
         assertEquals(MOD_ANNOTATION, emulated.modAnnotationType());
         assertTrue(emulated.forgeAnnotationBytes() > 0,
@@ -193,6 +203,9 @@ class StarwrightJarTest {
             assertFalse(Files.exists(Path.of(root)
                             .resolve("net/minecraftforge/fml/common/Mod.class")),
                     "pseudo Minecraft must not ship a Forge @Mod stub");
+            assertFalse(Files.exists(Path.of(root)
+                            .resolve("net/minecraftforge/eventbus/api/IEventBus.class")),
+                    "pseudo Minecraft must not ship a Forge IEventBus stub");
         }
     }
 
@@ -218,5 +231,16 @@ class StarwrightJarTest {
         assertTrue(emulated.pseudoMinecraftEvents().stream()
                         .anyMatch(event -> event.startsWith("log:[Starwright]")),
                 "pseudo game should record the mod's log line");
+    }
+
+    @Test
+    @DisplayName("localisation files exist for en_us and ja_jp")
+    void localisationFilesArePackaged() throws Exception {
+        for (String lang : List.of("en_us", "ja_jp")) {
+            String name = "assets/starwright/lang/" + lang + ".json";
+            assertTrue(emulated.entries().contains(name), name + " is missing from the jar");
+            JsonObject json = JsonParser.parseString(readEntry(name)).getAsJsonObject();
+            assertEquals("Starwright", json.get("itemGroup.starwright").getAsString());
+        }
     }
 }

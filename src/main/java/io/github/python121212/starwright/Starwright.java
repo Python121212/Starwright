@@ -1,15 +1,16 @@
 package io.github.python121212.starwright;
 
 import com.mojang.logging.LogUtils;
+import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 
 /**
- * Starwright - a load-only Forge mod for Minecraft 1.20.1.
+ * Starwright - Forge mod for Minecraft 1.20.1.
  *
- * <p>This is intentionally the smallest possible mod: FML discovers the {@code @Mod}
- * annotation from {@code META-INF/mods.toml}, instantiates this class and that is all.
- * No items, blocks, events or registries are added yet.</p>
+ * <p>FML injects the mod event bus into the constructor. Content registration
+ * (items, blocks, creative tabs, recipes, ...) is intentionally still empty:
+ * this class is the prepared foundation for the main development phase.</p>
  */
 @Mod(Starwright.MOD_ID)
 public class Starwright {
@@ -18,7 +19,8 @@ public class Starwright {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public Starwright() {
+    public Starwright(IEventBus modEventBus) {
+        // modEventBus is where DeferredRegister instances will be hooked up next.
         LOGGER.info("[Starwright] Loaded successfully (Minecraft 1.20.1 / Forge 47.x).");
     }
 }

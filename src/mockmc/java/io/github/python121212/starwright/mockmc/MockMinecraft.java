@@ -13,9 +13,9 @@ import java.util.List;
  *
  * <p>Everything under {@code net.minecraft.*}, {@code com.mojang.*} and
  * {@code org.slf4j.*} in this source set is a fake. Forge itself is NOT faked:
- * the real {@code net.minecraftforge.fml.common.Mod} annotation bytes are taken
- * from the Forge jar on the test classpath and injected by
- * {@code EmulatedForgeLoader}.</p>
+ * all {@code net.minecraftforge.*} classes (the {@code @Mod} annotation, the mod
+ * event bus, registries, ...) are loaded from the real Forge jar on the test
+ * classpath by {@code EmulatedForgeLoader}.</p>
  */
 public final class MockMinecraft {
 
@@ -41,6 +41,11 @@ public final class MockMinecraft {
 
     public static void recordLog(String message) {
         EVENTS.add("log:" + message);
+    }
+
+    /** Records a call made against the injected Forge mod event bus. */
+    public static void recordEventBusCall(String methodName) {
+        EVENTS.add("eventbus:" + methodName);
     }
 
     /** Called by the emulated FML after it instantiates a mod. */
