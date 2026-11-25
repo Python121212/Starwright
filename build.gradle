@@ -57,6 +57,14 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // Jar emulation tests (see src/test/java/.../EmulatedForgeLoader.java).
+    // These never start Minecraft: they load the built jar in an isolated
+    // class loader with tiny Forge/Mojang/slf4j stubs.
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'com.moandjiezana.toml:toml4j:0.7.2'
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 // Replace ${...} placeholders in mods.toml / pack.mcmeta with gradle.properties values.
@@ -107,6 +115,21 @@ publishing {
         maven {
             url "file://${project.projectDir}/mcmodsrepo"
         }
+    }
+}
+
+// `build` runs `check` -> `test`, so a single ./gradlew build both produces the
+// jar and verifies it. The emulation tests read the production jar, therefore
+// they must run after reobfJar rather than against the un-obfuscated classes.
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    dependsOn 'reobfJar'
+    systemProperty 'starwright.jar',
+            project.layout.buildDirectory.file("libs/${mod_id}-${mod_version}.jar").get().asFile.absolutePath
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = true
+        exceptionFormat = 'full'
     }
 }
 

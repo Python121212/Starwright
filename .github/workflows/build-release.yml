@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build Forge 1.20.1 mod
+    name: Build, emulate and release
     runs-on: ubuntu-22.04
 
     steps:
@@ -40,8 +40,40 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build jar
+      # `build` runs `assemble` (jar + reobfJar) and `check` (JUnit emulation
+      # tests) in one invocation, so the jar and its verification ship together.
+      - name: Build jar and run emulation tests
         run: ./gradlew build --no-daemon --stacktrace
+
+      - name: Summarize emulation tests
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob
+          import xml.etree.ElementTree as ET
+
+          files = sorted(glob.glob("build/test-results/test/TEST-*.xml"))
+          print("### Jar emulation tests\n")
+          if not files:
+              print("_No JUnit report was produced._")
+          else:
+              totals = dict(tests=0, failures=0, errors=0, skipped=0)
+              cases = []
+              for path in files:
+                  root = ET.parse(path).getroot()
+                  for key in totals:
+                      totals[key] += int(root.get(key, "0"))
+                  for case in root.findall("testcase"):
+                      bad = case.find("failure") is not None or case.find("error") is not None
+                      cases.append((bad, case.get("classname", ""), case.get("name", "")))
+              ok = totals["failures"] == 0 and totals["errors"] == 0
+              print(f"**{'passed' if ok else 'FAILED'}**\n")
+              print("| tests | failures | errors | skipped |")
+              print("| --- | --- | --- | --- |")
+              print(f"| {totals['tests']} | {totals['failures']} | {totals['errors']} | {totals['skipped']} |\n")
+              for bad, cls, name in cases:
+                  print(f"- {'FAIL' if bad else 'PASS'} `{cls}` / `{name}`")
+          PY
 
       - name: Collect artifacts
         run: |
@@ -57,6 +89,14 @@ jobs:
           name: starwright-${{ github.run_id }}
           path: staging/*.jar
           if-no-files-found: error
+
+      - name: Upload JUnit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-reports-${{ github.run_id }}
+          path: build/test-results/test/*.xml
+          if-no-files-found: warn
 
       - name: Publish jar to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
