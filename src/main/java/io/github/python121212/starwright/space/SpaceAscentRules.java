@@ -61,6 +61,19 @@ public final class SpaceAscentRules {
     }
 
     /**
+     * Survival and Adventure players have {@code mayfly = false}, so vanilla's
+     * anti-flying check would eventually disconnect them while they float above
+     * the build limit. The server hook temporarily grants flight permission
+     * while the continuous ascent is armed, and restores the original value as
+     * soon as the player is back below Y=320.
+     *
+     * @param flightAllowed the player's ORIGINAL {@code mayfly} value
+     */
+    public static boolean needsTemporaryFlightPermission(double y, boolean flightAllowed) {
+        return isArmed(y) && !flightAllowed;
+    }
+
+    /**
      * Moves {@code current} towards {@code target} by at most
      * {@link SpaceTuning#ASCENT_ACCELERATION} per tick and clamps the result.
      * Starting from a velocity inside the clamp range this makes both the

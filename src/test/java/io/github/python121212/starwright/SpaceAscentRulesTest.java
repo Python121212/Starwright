@@ -171,4 +171,33 @@ class SpaceAscentRulesTest {
         assertTrue(y <= SpaceTuning.ASCENT_ARM_Y + 1.0 + EPS);
         assertFalse(SpaceRules.isSpace(y));
     }
+
+    @Test
+    @DisplayName("Survival and Adventure get temporary flight permission above Y=320")
+    void survivalAndAdventureNeedTemporaryFlightPermission() {
+        assertTrue(SpaceAscentRules.needsTemporaryFlightPermission(320.0, false));
+        assertTrue(SpaceAscentRules.needsTemporaryFlightPermission(1_000.0, false));
+        assertTrue(SpaceAscentRules.needsTemporaryFlightPermission(5_000.0, false));
+        assertFalse(SpaceAscentRules.needsTemporaryFlightPermission(319.0, false));
+        assertFalse(SpaceAscentRules.needsTemporaryFlightPermission(0.0, false));
+        // Creative / Spectator already have flight and are never touched.
+        assertFalse(SpaceAscentRules.needsTemporaryFlightPermission(5_000.0, true));
+    }
+
+    @Test
+    @DisplayName("flight permission is released as soon as the player is back below Y=320")
+    void flightPermissionIsRestoredBelowBuildLimit() {
+        boolean granted = false;
+        for (double y = 5_000.0; y >= 0.0; y -= 10.0) {
+            boolean needs = SpaceAscentRules.needsTemporaryFlightPermission(y, false);
+            if (y >= SpaceTuning.ASCENT_ARM_Y) {
+                assertTrue(needs, "must keep flight permission at Y=" + y);
+                granted = true;
+            } else {
+                assertFalse(needs, "must release flight permission at Y=" + y);
+            }
+        }
+        assertTrue(granted);
+        assertFalse(SpaceAscentRules.needsTemporaryFlightPermission(319.999, false));
+    }
 }

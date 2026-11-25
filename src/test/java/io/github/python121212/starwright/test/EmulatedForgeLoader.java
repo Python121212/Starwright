@@ -62,6 +62,7 @@ public final class EmulatedForgeLoader {
             boolean monotonicAscent,
             boolean descentReversed,
             double creativeSpeedInSpace,
+            boolean survivalNeedsFlightPermission,
             List<Double> ascentTrace) {}
 
     /** Outcome of one emulated discovery + instantiation + ascent pass. */
@@ -209,6 +210,8 @@ public final class EmulatedForgeLoader {
         Method targetSpeed = rules.getMethod("targetSpeed",
                 double.class, boolean.class, boolean.class, boolean.class);
         Method stepTowards = rules.getMethod("stepTowards", double.class, double.class);
+        Method needsFlight = rules.getMethod("needsTemporaryFlightPermission",
+                double.class, boolean.class);
         Method recordAscent = mockmc.getMethod("recordAscent", double.class, double.class);
 
         assertTrue(maxSpeed > 0.0, "ASCENT_MAX_SPEED must be positive");
@@ -259,6 +262,9 @@ public final class EmulatedForgeLoader {
         // Creative flight must still return a climb speed from INSIDE space.
         double creativeSpeedInSpace = (double) targetSpeed.invoke(
                 null, spaceStartY + 100.0, false, false, true);
+        // Survival / Adventure (mayfly = false) must be granted flight above Y=320.
+        boolean survivalNeedsFlightPermission = (boolean) needsFlight.invoke(
+                null, armY + 100.0, false);
 
         return new AscentEmulation(
                 armY, spaceY, y,
@@ -266,7 +272,8 @@ public final class EmulatedForgeLoader {
                 ascentTicks, descentTicks,
                 maxAscentStep, maxDescentStep,
                 monotonicAscent, descentReversed,
-                creativeSpeedInSpace, List.copyOf(trace));
+                creativeSpeedInSpace, survivalNeedsFlightPermission,
+                List.copyOf(trace));
     }
 
     private static void assertTrue(boolean condition, String message) {

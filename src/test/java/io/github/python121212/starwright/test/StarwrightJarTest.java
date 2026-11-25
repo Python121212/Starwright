@@ -320,6 +320,8 @@ class StarwrightJarTest {
                 "SpaceAscentRules must expose targetSpeed in the production jar");
         assertTrue(rulesPool.contains("stepTowards"),
                 "SpaceAscentRules must expose stepTowards in the production jar");
+        assertTrue(rulesPool.contains("needsTemporaryFlightPermission"),
+                "SpaceAscentRules must decide Survival / Adventure flight permission");
         assertFalse(rulesPool.contains("net/minecraft"),
                 "ascent rules must not reference Minecraft classes (reobf-safe)");
         assertFalse(rulesPool.contains("net/minecraftforge"),
@@ -338,6 +340,8 @@ class StarwrightJarTest {
                 "the hook must smooth the velocity every tick");
         assertTrue(hooksPool.contains("START"),
                 "the hook must run at Phase.START so creative flight cannot overwrite it");
+        assertTrue(hooksPool.contains("needsTemporaryFlightPermission"),
+                "the hook must consult the Survival / Adventure permission rule");
         assertFalse(hooksPool.contains("net/minecraft/server/level/ServerLevel"),
                 "the hook must never create a ServerLevel or change dimension");
 
@@ -359,5 +363,12 @@ class StarwrightJarTest {
         assertEquals(ascent.maxSpeed(), ascent.creativeSpeedInSpace(), 1e-9,
                 "creative flight must still return a climb speed at Y > 5,000");
         assertTrue(ascent.creativeSpeedInSpace() > 0.0);
+    }
+
+    @Test
+    @DisplayName("production jar grants Survival/Adventure flight permission above the build limit")
+    void survivalAndAdventureAreGrantedFlightPermission() {
+        assertTrue(emulated.ascent().survivalNeedsFlightPermission(),
+                "Survival / Adventure must not be kicked by the vanilla anti-flying check");
     }
 }
