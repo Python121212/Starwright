@@ -14,7 +14,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
@@ -81,6 +83,23 @@ public final class EmulatedForgeLoader {
             boolean skipGroundAtGround,
             boolean skipGroundAtSpace) {}
 
+    /** Outcome of loading the production jar's pure ship engine. */
+    public record ShipEmulation(
+            int collected,
+            boolean floating,
+            boolean groundedRejected,
+            int visibleFaces,
+            boolean coreProtected,
+            boolean spareDetachable,
+            boolean wrenchDetach,
+            boolean wrenchAdvance,
+            boolean chestPassthrough,
+            int stepX,
+            int stepY,
+            int stepZ,
+            int maxBlocks,
+            int minBlocks) {}
+
     /** Outcome of one emulated discovery + instantiation + ascent pass. */
     public record Result(
             String modId,
@@ -95,7 +114,8 @@ public final class EmulatedForgeLoader {
             List<String> entries,
             List<String> constructorParameterTypes,
             AscentEmulation ascent,
-            RenderEmulation render) {}
+            RenderEmulation render,
+            ShipEmulation ship) {}
 
     private static final String MOD_ANNOTATION = "net.minecraftforge.fml.common.Mod";
     private static final String MAIN_CLASS = "io.github.python121212.starwright.Starwright";
@@ -106,6 +126,10 @@ public final class EmulatedForgeLoader {
     private static final String ASCENT_RULES_CLASS =
             "io.github.python121212.starwright.space.SpaceAscentRules";
     private static final int MAX_EMULATED_TICKS = 50_000;
+    private static final String SHIP_RULES_CLASS =
+            "io.github.python121212.starwright.ship.ShipStructureRules";
+    private static final String SHIP_TUNING_CLASS =
+            "io.github.python121212.starwright.ship.ShipTuning";
 
     private EmulatedForgeLoader() {}
 
@@ -177,6 +201,8 @@ public final class EmulatedForgeLoader {
             AscentEmulation ascent = runAscentEmulation(loader, mockmc);
             // Load the client sky rules straight from the production jar.
             RenderEmulation render = runRenderEmulation(loader);
+            // Load the ship engine from the production jar and assemble a hull.
+            ShipEmulation ship = runShipEmulation(loader, mockmc);
 
             boolean bootstrapped = (boolean) mockmc.getMethod("isBootstrapped").invoke(null);
             List<String> events = copyStrings(mockmc.getMethod("events").invoke(null));
@@ -194,6 +220,10 @@ public final class EmulatedForgeLoader {
             original.println("[emulated FML] sky: darkness 0 -> 1, stars "
                     + render.starsAtGround() + " -> " + render.starsAtSpace()
                     + ", ground rendered=" + !render.skipGroundAtSpace());
+            original.println("[emulated FML] ship: " + ship.collected()
+                    + " blocks, floating=" + ship.floating()
+                    + ", grounded rejected=" + ship.groundedRejected()
+                    + ", core protected=" + ship.coreProtected());
 
             return new Result(
                     modId,
@@ -208,7 +238,8 @@ public final class EmulatedForgeLoader {
                     List.copyOf(loader.jarEntries()),
                     paramTypes,
                     ascent,
-                    render);
+                    render,
+                    ship);
         } finally {
             loader.closeJar();
         }
@@ -354,6 +385,103 @@ public final class EmulatedForgeLoader {
                 (double) fogFactor.invoke(null, d5000),
                 (boolean) skipGround.invoke(null, 0.0),
                 (boolean) skipGround.invoke(null, 5_000.0));
+    }
+
+    /**
+     * Loads the ship engine from the PRODUCTION jar and really runs the flood
+     * fill on a pseudo hull: one floating in mid-air, one resting on terrain.
+     * The engine is pure Java, so no fake Level or fake BlockPos is required -
+     * a Proxy of the engine's own ShipBlockSource interface supplies the blocks.
+     */
+    private static ShipEmulation runShipEmulation(
+            ForgeBackedLoader loader, Class<?> mockmc) throws Exception {
+
+        Class<?> rules = loader.loadClass(SHIP_RULES_CLASS);
+        Class<?> tuning = loader.loadClass(SHIP_TUNING_CLASS);
+        Class<?> physics = loader.loadClass(
+                "io.github.python121212.starwright.ship.ShipPhysics");
+        Class<?> interaction = loader.loadClass(
+                "io.github.python121212.starwright.ship.ShipInteractionRules");
+        Class<?> sourceIface = loader.loadClass(
+                "io.github.python121212.starwright.ship.ShipBlockSource");
+
+        Method pack = rules.getMethod("pack", int.class, int.class, int.class);
+        Method collect = rules.getMethod("collect",
+                int.class, int.class, int.class, sourceIface);
+        Method isFloating = rules.getMethod("isFloating", long[].class, sourceIface);
+        Method visibleFaces = rules.getMethod("visibleFaces", long[].class);
+        Method canDetach = rules.getMethod("canDetach",
+                long[].class, long.class, sourceIface);
+        Method clampStep = physics.getMethod("clampStep",
+                int.class, int.class, int.class);
+        Method wrenchDetach = interaction.getMethod("isWrenchDetach",
+                boolean.class, boolean.class, boolean.class, boolean.class);
+        Method wrenchAdvance = interaction.getMethod("isWrenchAdvance",
+                boolean.class, boolean.class, boolean.class);
+        Method passthrough = interaction.getMethod("isVanillaPassthrough",
+                boolean.class, boolean.class);
+
+        long core = (long) pack.invoke(null, 0, 0, 0);
+        Set<Long> floating = new HashSet<>();
+        floating.add(core);
+        for (int[] cell : new int[][] {{1, 0, 0}, {0, 1, 0}, {0, 0, 1},
+                {2, 0, 0}, {1, 1, 0}}) {
+            floating.add((long) pack.invoke(null, cell[0], cell[1], cell[2]));
+        }
+        Object floatingSource = blockSource(loader, sourceIface, floating, core);
+        long[] hull = (long[]) collect.invoke(null, 0, 0, 0, floatingSource);
+        boolean floats = (boolean) isFloating.invoke(null, hull, floatingSource);
+        int faces = (int) visibleFaces.invoke(null, hull);
+
+        // The same hull resting on terrain: the flood fill follows stone all
+        // the way down to the radius limit, so the bottom check must reject it.
+        Set<Long> grounded = new HashSet<>(floating);
+        for (int y = -1; y >= -34; y--) {
+            grounded.add((long) pack.invoke(null, 0, y, 0));
+        }
+        Object groundedSource = blockSource(loader, sourceIface, grounded, core);
+        long[] groundedHull = (long[]) collect.invoke(null, 0, 0, 0, groundedSource);
+        boolean groundedRejected =
+                !(boolean) isFloating.invoke(null, groundedHull, groundedSource);
+
+        long spare = (long) pack.invoke(null, 2, 0, 0);
+        boolean coreProtected = !(boolean) canDetach.invoke(null, hull, core, floatingSource);
+        boolean spareDetachable = (boolean) canDetach.invoke(null, hull, spare, floatingSource);
+        boolean detach = (boolean) wrenchDetach.invoke(null, true, true, true, false);
+        boolean advance = (boolean) wrenchAdvance.invoke(null, false, true, true);
+        boolean chestStillVanilla = (boolean) passthrough.invoke(null, false, true);
+        int[] step = (int[]) clampStep.invoke(null, 0, 0, 1);
+        int maxBlocks = tuning.getField("MAX_BLOCKS").getInt(null);
+        int minBlocks = tuning.getField("MIN_BLOCKS").getInt(null);
+
+        Method recordShip = mockmc.getMethod("recordShip", String.class);
+        recordShip.invoke(null, "collect=" + hull.length + ",floating=" + floats);
+        recordShip.invoke(null, "groundedRejected=" + groundedRejected
+                + ",coreProtected=" + coreProtected
+                + ",spareDetachable=" + spareDetachable);
+        recordShip.invoke(null, "wrenchDetach=" + detach
+                + ",wrenchAdvance=" + advance
+                + ",chestPassthrough=" + chestStillVanilla);
+
+        return new ShipEmulation(
+                hull.length, floats, groundedRejected, faces,
+                coreProtected, spareDetachable, detach, advance, chestStillVanilla,
+                step[0], step[1], step[2], maxBlocks, minBlocks);
+    }
+
+    /** Pseudo block access: only the engine's own interface, no Minecraft. */
+    private static Object blockSource(ClassLoader loader, Class<?> iface,
+                                      Set<Long> solid, long core) {
+        return Proxy.newProxyInstance(loader, new Class<?>[] { iface },
+                (proxy, method, args) -> {
+                    if (method.getName().equals("isSolid")) {
+                        return solid.contains((Long) args[0]);
+                    }
+                    if (method.getName().equals("isCore")) {
+                        return ((Long) args[0]) == core;
+                    }
+                    return false;
+                });
     }
 
     private static void assertTrue(boolean condition, String message) {

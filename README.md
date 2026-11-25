@@ -1,7 +1,8 @@
 # Starwright
 
-Minecraft **1.20.1** 用の **Forge** mod です。
-まずは「読み込みだけ」の最小構成から始めています。機能（アイテム・ブロック・イベント登録など）はまだ何も追加していません。
+Minecraft **1.20.1** 用の **Forge** 単独 mod です。
+「読み込みだけ」の最小構成から始め、**宇宙**・**空/星/地上描画カット**・**コアブロックとレンチによる船化**まで実装済みです。
+Create / Create Aeronautics には一切依存しません。
 
 ## この mod がすること
 
@@ -20,11 +21,14 @@ mod 本体のファイルは **`src/main`**（Gradle の main ソースセット
 
 ```
 src/main/java/io/github/python121212/starwright/Starwright.java  ... @Mod エントリポイント
+src/main/java/io/github/python121212/starwright/space/           ... 宇宙（純 Java ルール + Forge フック + 描画）
+src/main/java/io/github/python121212/starwright/ship/            ... 船化エンジン（純 Java）と Forge 側ブリッジ
 src/main/resources/META-INF/mods.toml                          ... mod 定義・依存関係
+docs/SPACE.md / docs/SHIP.md                                   ... 宇宙 / 船の仕様
 src/main/resources/pack.mcmeta                                 ... リソースパック情報
 src/mockmc/java/                                               ... 擬似マイクラ（フェイク実装一式）
 src/test/java/.../EmulatedForgeLoader.java                     ... 実 Forge ＋ 擬似マイクラで FML を再現
-src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（54 件）
+src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（32 件）
 build.gradle / settings.gradle / gradle.properties             ... ビルド定義（ルート）
 gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 wrapper
 .github/workflows/build-release.yml                          ... GitHub Actions（CI）
@@ -65,7 +69,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 5. 擬似マイクラの `MockMinecraft` に mod を登録し、起動／ログ／登録の記録を回収
 6. ログをキャプチャして `[MockMC] Booting pseudo Minecraft 1.20.1` と `[Starwright] Loaded successfully` を確認
 
-### 検証項目（JUnit 54 件）
+### 検証項目（JUnit 71 件）
 
 | 種別 | 内容 |
 | --- | --- |
@@ -84,7 +88,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 | --- | --- |
 | Forge 1.20.1 (47.2.0) / Gradle 8.1.1 / JDK 17 | ✅ ビルド定義済み |
 | 読み込みだけの jar → GitHub Releases | ✅ `v1.0.0` |
-| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 54 件 |
+| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 71 件 |
 | CI の発火条件 | ✅ jar 入力／本題の変更のみ。ドキュメントのみは無発火 |
 | **mod イベントバスの注入** | ✅ `Starwright(IEventBus)` — FML が本物のバスを渡す |
 | **`net.minecraftforge.*` はすべて本物** | ✅ エミュレータが test classpath の Forge jar から供給（`@Mod` だけでなく `IEventBus` 等も） |
@@ -94,16 +98,15 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 また `net.minecraft.*` / `com.mojang.*` / `org.slf4j.*` は擬似マイクラ**だけ**が供给され、足りないクラスは
 `pseudo Minecraft does not implement ...` と明示的に失敗します（本物の Minecraft が紛れ込むことはありません）。
 
-### 本題でアイテム／ブロックを追加するときの手順
+### アイテム／ブロックの登録方針
 
-1. `src/main/java/.../registry/` に `DeferredRegister` を持つクラスを作り、`Starwright` コンストラクタの `modEventBus` に `register(...)` する
-2. `assets/starwright/lang/*.json` に表示名、`models/` と `textures/` にモデル・テクスチャを置く
-3. `data/starwright/recipes/` にレシピを置く（必要なら）
-4. その登録コードが参照する **`net.minecraft.*` クラスだけ**を `src/mockmc/java` に擬似実装として追加する
-5. `./gradlew build` → jar 生成とテストが一緒に走る。`src/main` を触っているので **CI も必ず発火**します
+`ShipRegistry` は **`@Mod.EventBusSubscriber(bus = MOD)` + `RegisterEvent`** でブロック・アイテム・エンティティを登録します。
+`Starwright` エントリポイントは登録クラスを一切参照しないため、実 Forge／擬似マイクラのエミュレータは
+`Starwright.class` だけを隔離ロードでき、**`src/mockmc` に MC クラスを足す必要がありません**。
+モデルはバニラのテクスチャを参照する JSON だけ（PNG 追加 0）。レシピ・`data/` は未使用です。
 
-> Forge 側のクラス（`DeferredRegister`, `RegistryObject`, `IEventBus` …）はすべて本物が供給されるため、
-> `src/mockmc` に Forge のスタブを置く必要はありません。
+> `DeferredRegister` / `mods.toml` の `[[mixins]]` は Forge 1.20.1 では使いません。
+> Mixin は jar manifest の `MixinConfigs` で登録しています。
 
 ## 本題: 宇宙（Space）
 
@@ -134,6 +137,22 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 
 判定ロジック・サーバー側フック・連続昇降・描画・テストまで実装済みです。
 残るは Step 6（酸素・気圧・モブスポーン抑制など）のみです。詳細は [docs/SPACE.md](docs/SPACE.md)。
+
+## 本題: 船（Ship）
+
+仕様は **[docs/SHIP.md](docs/SHIP.md)** にまとめています。
+
+- **コアブロック**を、自分で建てた**空中に浮いている**構造のどこかに置くと、構造全体が **1 つの `ShipEntity` に所有**されて船になります。
+  地面や別の建造物に接している場合は船化しません（コアは普通のブロックとして残ります）。
+- **レンチ**の **シフト右クリック**で、船化したときにくっついてきた不要なブロックを掘って外せます。コアは外せません。
+  **通常右クリック**で船を 1 ブロック進めます（向いている方向・1 軸のみ）。
+- 船になったあとも **内部にブロックを置く／歩く／チェストを開く／なんでもできます**。
+  ブロックは `Level` に残るので、バニラの相互作用を 1 つも再実装していません。
+- **独自エンジンで Create Aeronautics より軽量**: 物理演算・回転・衝突ソルバ・仮想レベル・船メッシュは **0**。
+  毎 tick の処理は無く、移動は「クリック 1 回 = 1 ブロック」のバッチ移送だけです（チェスト等は NBT で運びます）。
+  `ShipEntity` のレンダラは描画を一切しない `NoopShipRenderer`（ドローコール 0）。
+- **Create / Create Aeronautics / flywheel / AstroDock の船は不使用**。依存は Forge だけの単独 mod です。
+  モデル 3 個・blockstate 1 個・PNG 0 個と最小構成です。
 
 ## 導入
 

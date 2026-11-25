@@ -401,13 +401,14 @@ class StarwrightJarTest {
     }
 
     @Test
-    @DisplayName("no AstroDock items, screens, ships or models were copied in")
+    @DisplayName("no AstroDock items, screens or pasted ship code were copied in")
     void noItemsOrUiWereCopiedIn() {
         for (String entry : emulated.entries()) {
             assertFalse(entry.contains("Screen.class"), "no UI: " + entry);
             assertFalse(entry.contains("flight_capsule"), "no capsule item: " + entry);
-            assertFalse(entry.contains("Ship.class"), "no ship entity: " + entry);
-            assertFalse(entry.startsWith("assets/starwright/models/"), "no item/block models: " + entry);
+            assertFalse(entry.contains("FlightCapsule"), "no capsule entity: " + entry);
+            assertFalse(entry.contains("ShipGuideScreen"), "no ship guide UI: " + entry);
+            assertFalse(entry.contains("CoreScreen"), "no core UI: " + entry);
             assertFalse(entry.startsWith("data/"), "no dimension overrides: " + entry);
         }
     }
@@ -472,9 +473,12 @@ class StarwrightJarTest {
         for (String entry : emulated.entries()) {
             assertFalse(entry.endsWith(".refmap.json"), "no refmap: " + entry);
             assertFalse(entry.endsWith(".png"), "no textures: " + entry);
-            assertFalse(entry.startsWith("assets/starwright/models/"), "no models: " + entry);
             assertFalse(entry.contains("Screen.class"), "no UI: " + entry);
         }
+        assertEquals(3, emulated.entries().stream()
+                        .filter(entry -> entry.startsWith("assets/starwright/models/"))
+                        .count(),
+                "only three tiny models, all reusing vanilla textures");
         String pool = new String(readClassBytes(
                         "io/github/python121212/starwright/space/SpaceRenderRules.class"),
                 StandardCharsets.ISO_8859_1);
@@ -482,5 +486,118 @@ class StarwrightJarTest {
                 "SpaceRenderRules must stay pure Java");
         assertFalse(pool.contains("net/minecraftforge"),
                 "SpaceRenderRules must stay emulator-safe");
+    }
+
+    @Test
+    @DisplayName("core block, wrench and ship entity are shipped in the jar")
+    void shipContentIsPackaged() {
+        for (String name : List.of(
+                "io/github/python121212/starwright/ship/ShipTuning.class",
+                "io/github/python121212/starwright/ship/ShipBlockSource.class",
+                "io/github/python121212/starwright/ship/ShipStructureRules.class",
+                "io/github/python121212/starwright/ship/ShipStructure.class",
+                "io/github/python121212/starwright/ship/ShipPhysics.class",
+                "io/github/python121212/starwright/ship/ShipInteractionRules.class",
+                "io/github/python121212/starwright/ship/forge/CoreBlock.class",
+                "io/github/python121212/starwright/ship/forge/WrenchItem.class",
+                "io/github/python121212/starwright/ship/forge/ShipEntity.class",
+                "io/github/python121212/starwright/ship/forge/ShipForgeBridge.class",
+                "io/github/python121212/starwright/ship/forge/ShipRegistry.class",
+                "io/github/python121212/starwright/ship/forge/client/ShipClientRegistry.class",
+                "io/github/python121212/starwright/ship/forge/client/NoopShipRenderer.class")) {
+            assertTrue(emulated.entries().contains(name), "missing from jar: " + name);
+        }
+    }
+
+    @Test
+    @DisplayName("ship engine is pure Java and survives reobf without MC names")
+    void shipEngineStaysPureJava() throws Exception {
+        for (String name : List.of("ShipTuning", "ShipStructureRules", "ShipStructure",
+                "ShipPhysics", "ShipInteractionRules")) {
+            String pool = new String(readClassBytes(
+                            "io/github/python121212/starwright/ship/" + name + ".class"),
+                    StandardCharsets.ISO_8859_1);
+            assertFalse(pool.contains("net/minecraft"), name + " must stay pure Java");
+            assertFalse(pool.contains("net/minecraftforge"),
+                    name + " must stay emulator-safe");
+        }
+    }
+
+    @Test
+    @DisplayName("no Create, Create Aeronautics or flywheel dependency anywhere")
+    void noCreateOrAeronauticsDependency() throws Exception {
+        String toml = readEntry("META-INF/mods.toml");
+        assertFalse(toml.contains("simibubi"), "no Create mod id in the manifest");
+        assertFalse(toml.contains("createaeronautics"), "no CA mod id in the manifest");
+        for (String entry : emulated.entries()) {
+            assertFalse(entry.contains("simibubi"), "no Create package: " + entry);
+            assertFalse(entry.contains("createaeronautics"), "no CA package: " + entry);
+            assertFalse(entry.contains("flywheel"), "no flywheel renderer: " + entry);
+            if (entry.endsWith(".class")) {
+                String pool = new String(readClassBytes(entry), StandardCharsets.ISO_8859_1);
+                assertFalse(pool.contains("com/simibubi"), "no Create reference: " + entry);
+                assertFalse(pool.contains("createaeronautics"), "no CA reference: " + entry);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("ship models are minimal and reuse vanilla textures")
+    void shipModelsAreMinimal() throws Exception {
+        assertEquals(1, emulated.entries().stream()
+                .filter(entry -> entry.startsWith("assets/starwright/blockstates/"))
+                .count());
+        for (String entry : emulated.entries()) {
+            assertFalse(entry.endsWith(".png"), "no new textures: " + entry);
+        }
+        assertTrue(readEntry("assets/starwright/models/block/core_block.json")
+                .contains("minecraft:block/iron_block"));
+        assertTrue(readEntry("assets/starwright/models/item/wrench.json")
+                .contains("minecraft:item/iron_ingot"));
+    }
+
+    @Test
+    @DisplayName("localisation names the core block, wrench and ship")
+    void shipNamesAreLocalised() throws Exception {
+        for (String lang : List.of("en_us", "ja_jp")) {
+            JsonObject json = JsonParser.parseString(
+                    readEntry("assets/starwright/lang/" + lang + ".json")).getAsJsonObject();
+            assertTrue(json.has("block.starwright.core_block"));
+            assertTrue(json.has("item.starwright.wrench"));
+            assertTrue(json.has("entity.starwright.ship"));
+        }
+        String japanese = readEntry("assets/starwright/lang/ja_jp.json");
+        assertTrue(japanese.contains("コアブロック"));
+        assertTrue(japanese.contains("レンチ"));
+    }
+
+    @Test
+    @DisplayName("production jar assembles only a floating hull")
+    void productionJarShipEngineAssemblesOnlyFloatingHulls() {
+        EmulatedForgeLoader.ShipEmulation ship = emulated.ship();
+        assertTrue(ship.floating(), "an airborne hull must assemble");
+        assertTrue(ship.groundedRejected(), "a grounded hull must be refused");
+        assertEquals(6, ship.collected());
+        assertTrue(ship.coreProtected(), "the core must never be wrenched off");
+        assertTrue(ship.spareDetachable(), "extra blocks must be removable");
+        assertTrue(ship.wrenchDetach());
+        assertTrue(ship.wrenchAdvance());
+        assertTrue(ship.chestPassthrough(),
+                "chests / walking / placing blocks stay vanilla");
+        assertEquals(0, ship.stepX());
+        assertEquals(0, ship.stepY());
+        assertEquals(1, ship.stepZ(), "one axis, one block per click");
+        assertTrue(ship.visibleFaces() > 0);
+        assertEquals(4096, ship.maxBlocks());
+        assertEquals(2, ship.minBlocks());
+    }
+
+    @Test
+    @DisplayName("pseudo Minecraft recorded every ship-engine decision")
+    void pseudoMinecraftRecordedShipDecisions() {
+        assertEquals(3, emulated.pseudoMinecraftEvents().stream()
+                .filter(event -> event.startsWith("ship:")).count());
+        assertTrue(emulated.pseudoMinecraftEvents().stream()
+                .anyMatch(event -> event.contains("groundedRejected=true")));
     }
 }

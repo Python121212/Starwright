@@ -21,7 +21,9 @@ public class Starwright {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public Starwright(IEventBus modEventBus) {
-        // modEventBus is where DeferredRegister instances will be hooked up next.
+        // Blocks, items and the ship entity register themselves via
+        // @Mod.EventBusSubscriber(RegisterEvent). Keeping them out of this class
+        // means the jar emulator still loads the mod in complete isolation.
         LOGGER.info("[Starwright] Loaded successfully (Minecraft 1.20.1 / Forge 47.x).");
     }
 }

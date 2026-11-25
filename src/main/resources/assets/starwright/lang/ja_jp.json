@@ -1,3 +1,7 @@
 {
-  "itemGroup.starwright": "Starwright"
+  "itemGroup.starwright": "Starwright",
+  "block.starwright.core_block": "コアブロック",
+  "item.starwright.core_block": "コアブロック",
+  "item.starwright.wrench": "レンチ",
+  "entity.starwright.ship": "船"
 }

@@ -57,6 +57,14 @@ public final class MockMinecraft {
         EVENTS.add(String.format("ascent:y=%.2f,vy=%.2f", y, velocity));
     }
 
+    /**
+     * Records one emulated ship-engine decision made by the production jar's
+     * pure rules (flood fill, floating check, wrench action).
+     */
+    public static void recordShip(String decision) {
+        EVENTS.add("ship:" + decision);
+    }
+
     /** Called by the emulated FML after it instantiates a mod. */
     public static void recordMod(String modId) {
         if (!ResourceLocation.isValidNamespace(modId)) {
