@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,10 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@DisplayName("Built jar / emulated Forge load")
+@DisplayName("Built jar / real Forge + pseudo Minecraft")
 class StarwrightJarTest {
 
     private static final String MOD_ID = "starwright";
+    private static final String MOD_ANNOTATION = "net.minecraftforge.fml.common.Mod";
     private static Path jar;
     private static EmulatedForgeLoader.Result emulated;
 
@@ -169,5 +172,51 @@ class StarwrightJarTest {
         assertNotNull(emulated.instance(), "the mod constructor must run");
         assertTrue(emulated.log().contains("[Starwright] Loaded successfully"),
                 "the mod should log its load message, got: " + emulated.log());
+    }
+
+    @Test
+    @DisplayName("the REAL Forge @Mod annotation is used, not a stub")
+    void usesRealForgeAnnotation() throws Exception {
+        Class<?> real = Class.forName(MOD_ANNOTATION);
+        assertTrue(real.isAnnotation());
+        assertNotNull(real.getDeclaredMethod("value"));
+
+        assertEquals(MOD_ANNOTATION, emulated.modAnnotationType());
+        assertTrue(emulated.forgeAnnotationBytes() > 0,
+                "Forge annotation bytecode must come from the real Forge jar");
+        assertNotNull(emulated.forgeCodeSource());
+
+        // The pseudo Minecraft source set must never fake Forge itself.
+        String roots = System.getProperty("starwright.mockmc");
+        assertNotNull(roots, "pseudo Minecraft classes were not built");
+        for (String root : roots.split(Pattern.quote(File.pathSeparator))) {
+            assertFalse(Files.exists(Path.of(root)
+                            .resolve("net/minecraftforge/fml/common/Mod.class")),
+                    "pseudo Minecraft must not ship a Forge @Mod stub");
+        }
+    }
+
+    @Test
+    @DisplayName("pseudo Minecraft boots as 1.20.1")
+    void pseudoMinecraftBootstraps() {
+        assertTrue(emulated.pseudoMinecraftBootstrapped());
+        assertTrue(emulated.pseudoMinecraftEvents().stream()
+                        .anyMatch(event -> event.equals("bootstrap:1.20.1")),
+                "pseudo game should boot as 1.20.1, events: " + emulated.pseudoMinecraftEvents());
+        assertTrue(emulated.log().contains("[MockMC] Booting pseudo Minecraft 1.20.1"));
+        assertTrue(emulated.log().contains("[MockMC/INFO]"));
+    }
+
+    @Test
+    @DisplayName("emulated FML registers the mod in pseudo Minecraft")
+    void modIsRegisteredInPseudoMinecraft() {
+        assertTrue(emulated.loadedMods().contains(MOD_ID),
+                "FML should register " + MOD_ID + ", got: " + emulated.loadedMods());
+        assertTrue(emulated.pseudoMinecraftEvents().stream()
+                        .anyMatch(event -> event.equals("mod:" + MOD_ID)),
+                "pseudo game should record the mod registration");
+        assertTrue(emulated.pseudoMinecraftEvents().stream()
+                        .anyMatch(event -> event.startsWith("log:[Starwright]")),
+                "pseudo game should record the mod's log line");
     }
 }

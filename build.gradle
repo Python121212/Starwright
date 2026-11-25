@@ -51,6 +51,18 @@ minecraft {
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+// "Pseudo Minecraft": fake net.minecraft.* / com.mojang.* / org.slf4j.* classes
+// used by the emulator. It is compiled against the JDK ONLY so that no real
+// Minecraft or Forge class can accidentally satisfy one of these names.
+// Forge itself is never faked - the real @Mod bytecode is injected at test time.
+sourceSets {
+    mockmc {
+        java.srcDir 'src/mockmc/java'
+        compileClasspath = files()
+        runtimeClasspath = files() + output
+    }
+}
+
 repositories {
     mavenCentral()
 }
@@ -59,8 +71,8 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     // Jar emulation tests (see src/test/java/.../EmulatedForgeLoader.java).
-    // These never start Minecraft: they load the built jar in an isolated
-    // class loader with tiny Forge/Mojang/slf4j stubs.
+    // They use the real Forge @Mod annotation + the pseudo Minecraft runtime,
+    // and never launch Minecraft.
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testImplementation 'com.moandjiezana.toml:toml4j:0.7.2'
     testImplementation 'com.google.code.gson:gson:2.10.1'
@@ -118,14 +130,15 @@ publishing {
     }
 }
 
-// `build` runs `check` -> `test`, so a single ./gradlew build both produces the
-// jar and verifies it. The emulation tests read the production jar, therefore
-// they must run after reobfJar rather than against the un-obfuscated classes.
+// `build` runs `check` -> `test`, so a single ./gradlew build produces the jar
+// and verifies it. The emulation tests read the production jar and the compiled
+// pseudo Minecraft classes, hence the explicit task dependencies.
 tasks.named('test', Test).configure {
     useJUnitPlatform()
-    dependsOn 'reobfJar'
+    dependsOn 'reobfJar', 'mockmcClasses'
     systemProperty 'starwright.jar',
             project.layout.buildDirectory.file("libs/${mod_id}-${mod_version}.jar").get().asFile.absolutePath
+    systemProperty 'starwright.mockmc', sourceSets.mockmc.output.classesDirs.asPath
     testLogging {
         events 'passed', 'skipped', 'failed'
         showStandardStreams = true

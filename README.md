@@ -22,8 +22,9 @@ mod 本体のファイルは **`src/main`**（Gradle の main ソースセット
 src/main/java/io/github/python121212/starwright/Starwright.java  ... @Mod エントリポイント
 src/main/resources/META-INF/mods.toml                          ... mod 定義・依存関係
 src/main/resources/pack.mcmeta                                 ... リソースパック情報
-src/test/java/.../EmulatedForgeLoader.java                     ... FML もどき（jar エミュレータ）
-src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト
+src/mockmc/java/                                               ... 擬似マイクラ（フェイク実装一式）
+src/test/java/.../EmulatedForgeLoader.java                     ... 実 Forge ＋ 擬似マイクラで FML を再現
+src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（11 件）
 build.gradle / settings.gradle / gradle.properties             ... ビルド定義（ルート）
 gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 wrapper
 .github/workflows/build-release.yml                          ... GitHub Actions（CI）
@@ -33,7 +34,7 @@ gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 w
 
 ## ビルド
 
-必要なもの: **JDK 17**（1.20.1 / Forge 47.x は Java 17 必須。エミュレーションテストも JDK のコンパイラを使います）
+必要なもの: **JDK 17**（1.20.1 / Forge 47.x は Java 17 必須）
 
 ```bash
 ./gradlew build
@@ -43,30 +44,37 @@ gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 w
 成果物は `build/libs/starwright-1.0.0.jar`（`reobfJar` 済みの本番用 jar）。
 テストだけ実行したい場合は `./gradlew test`、開発環境で起動したい場合は `./gradlew runClient` / `./gradlew runServer` を使えます。
 
-## jar のエミュレーションテスト
+## Forge を使用したエミュレーション ＋ 擬似マイクラ
 
-Minecraft や Forge を**一切起動せずに**、ビルド済み jar が「読み込めるか」を検証します。
-`EmulatedForgeLoader` が FML の mod 検出を模します:
+Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側は擬似**という役割分担でビルド済み jar を検証します。
 
-1. テスト時に `@Mod` / `Logger` / `LogUtils` の**最小スタブをその場でコンパイル**
-2. 親を `null`（bootstrap のみ）にした**隔離 ClassLoader** で jar をロード
-   → テスト用 classpath にある本物の Forge/Minecraft は絶対に混入しない
-3. `@Mod` アノテーションを読んで modId を取得し、**引数なしコンストラクタを実行**（FML と同じ手順）
-4. 出力されたログをキャプチャして、`[Starwright] Loaded successfully` が出たことを確認
-
-あわせて jar の中身も静的に検証します:
-
-| 検証項目 | 内容 |
+| 層 | 中身 |
 | --- | --- |
-| エントリ | mod クラス・`mods.toml`・`pack.mcmeta`・`MANIFEST.MF` が入っている |
-| プレースホルダ | `${...}` が展開し忘れなく残っていないか |
-| `mods.toml` | `javafml` / `loaderVersion=[47,)` / mod が 1 個だけ / Forge・Minecraft 依存 |
-| `pack.mcmeta` | `pack_format=15`（1.20.1） |
-| MANIFEST | `Implementation-Title` / `Version` / `Timestamp` |
-| バイトコード | class が **Java 17 (major 61)** であること |
+| **Forge（本物）** | テスト用 classpath の本物の `net.minecraftforge.fml.common.Mod`（Forge 47.2.0 の jar から class バイト列を読み、隔離ローダーに定義）。`src/mockmc` に Forge のスタブは**一切無い** |
+| **擬似マイクラ** | `src/mockmc/java` の `net.minecraft.*` / `com.mojang.logging.*` / `org.slf4j.*` のフェイク実装と、`MockMinecraft`（起動・ログ・mod 登録を記録する疑似ランタイム） |
+| **mod（本物）** | ビルド済み `build/libs/starwright-1.0.0.jar` を実際にロードしてコンストラクタを実行 |
 
-テストは `build/libs` の**本番 jar**（reobf 後）を読むため、`test` は `reobfJar` に依存させています。
-Gradle のテストログには `[emulated FML] ...` と実際のログ行が出力されます。
+`src/mockmc` は **JDK のみを classpath にして独立コンパイル**されるため、本物の Minecraft / Forge クラスが紛れ込むことはありません。
+
+`EmulatedForgeLoader` の流れ:
+
+1. テスト classpath から**本物の `@Mod` のバイト列**を読み、CodeSource（Forge jar の場所）を記録
+2. 親を `null`（bootstrap のみ）にした隔離 `ClassLoader` を用意 → 本物の Minecraft クラスは混入しない
+3. `@Mod` は本物のバイト列、`net.minecraft.*` 等は擬似マイクラ、mod クラスは jar から、それぞれ `defineClass`
+4. `@Mod("starwright")` を読んで modId を取得し、**引数なしコンストラクタを実行**（FML と同じ手順）
+5. 擬似マイクラの `MockMinecraft` に mod を登録し、起動／ログ／登録の記録を回収
+6. ログをキャプチャして `[MockMC] Booting pseudo Minecraft 1.20.1` と `[Starwright] Loaded successfully` を確認
+
+### 検証項目（JUnit 11 件）
+
+| 種別 | 内容 |
+| --- | --- |
+| jar 静的検証 | エントリ、`${...}` 展開漏れ、`mods.toml`、`pack.mcmeta`、MANIFEST、class が Java 17 (major 61) |
+| 実 Forge | 本物の `@Mod` が classpath に存在し、そのバイト列が使われている／擬似マイクラ側に Forge スタブが無い |
+| 擬似マイクラ | `bootstrap:1.20.1` で起動、`[MockMC/INFO]` ログ、`mod:starwright` の登録が記録されている |
+| エミュレート読み込み | `@Mod` 検出 → コンストラクタ実行 → `[Starwright] Loaded successfully` |
+
+テストは本番 jar（reobf 後）と擬似マイクラのコンパイル済みクラスを読むため、`test` は `reobfJar` と `mockmcClasses` に依存させています。Gradle のテストログには `[emulated FML] ...` と実際のログ行が出力されます。
 
 ## 導入
 
