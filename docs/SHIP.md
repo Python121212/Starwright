@@ -62,7 +62,7 @@ Create Aeronautics は「コントラプション」としてブロックをレ�
 | 回転・衝突ソルバ | あり | **なし**（移動先が埋まっていたら動かないだけ） |
 | 船メッシュ | 毎フレーム更新・バッチ再構築 | **0**。`NoopShipRenderer` は描画しない |
 | ドローコール | 船メッシュ分 | **0**（バニラの地形レンダラが描く） |
-| 毎 tick の処理 | あり | **`ShipEntity#tick()` は空**。`noPhysics = true` |
+| 毎 tick の追加処理 | あり | **0**（`tick()` を override せず、`noPhysics = true` で重力も停止） |
 | チェスト / 設置 / 歩行 | 仮想レベルで再実装 | **バニラにそのまま委譲**（再実装 0 行） |
 | コンテナ移送 | コントラプションの NBT | `saveWithFullMetadata()` → `loadStatic()` を入力時 1 回だけ |
 | 追加依存 | Create / flywheel | **Forge のみ** |
