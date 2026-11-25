@@ -85,7 +85,7 @@ public final class EmulatedForgeLoader {
                 new URL[] { stubs.toUri().toURL(), jar.toUri().toURL() }, null)) {
 
             Class<?> modClass = loader.loadClass(MAIN_CLASS);
-            Object annotation = Arrays.stream(modClass.getAnnotations())
+            var annotation = Arrays.stream(modClass.getAnnotations())
                     .filter(a -> a.annotationType().getName().equals(MOD_ANNOTATION))
                     .findFirst()
                     .orElseThrow(() -> new AssertionError(
@@ -104,7 +104,7 @@ public final class EmulatedForgeLoader {
                 } finally {
                     System.setOut(original);
                 }
-                log = buffer.toString(StandardCharsets.UTF_8).trim();
+                log = new String(buffer.toByteArray(), StandardCharsets.UTF_8).trim();
             }
 
             // Echo into the Gradle test log so the emulated load is visible in CI.
