@@ -65,12 +65,26 @@ gravityScale    = 1 - 0.95 * t // 宇宙でも 0 にはしない
 | 2 | 空を段階的に暗くする（`FogEvents` / `RegisterDimensionSpecialEffectsEvent`） | ⏳ |
 | 3 | 見える星を増やす（`DimensionSpecialEffects#renderSky` の差し替え） | ⏳ |
 | 4 | 地上描画の完全カット（`LevelRenderer` Mixin ＋ refmap） | ⏳ |
-| 5 | Y=5,000 への**連続移動**手段（チャンク拡張は不要・不可能） | ⏳ |
+| 5 | Y=5,000 への**連続移動**手段（建築限界バニラ維持が確定・実装待ち） | ⏳ |
 | 6 | 酸素・気圧・モブスポーン抑制・音の減衰など | ⏳ |
 
 Step 2〜4 はクライアント描画に深入りするため、Mixin あるいは Forge の
 クライアント拡張ポイントの追加が必要です。判定側は完成しているので、
 描画側を足すだけの状態です。
+
+## ✅ 決定事項（ユーザー承認）
+
+**建築限界高度はバニラのまま変更しません。**
+
+- `data/minecraft/dimension_type/overworld.json` を**作らない**
+- `data/*/dimension/**` も作らない（ディメンション追加なし）
+- `min_y = -64` / `height = 384` / `logical_height = 384` / 最大 Y = 319 を維持
+- `SpaceTuning.SPACE_START_Y = 5,000` は不変
+- Y=5,000 は**建築限界の外側にあるエンティティ座標**として扱う（チャンクは存在しない）
+- 到達は `changeDimension` / `/tp` ではなく**連続移動**（Step 5）
+
+この決定は `SpaceRulesTest#buildLimitStaysVanilla` と
+`StarwrightJarTest#noDimensionTypeOverride` で固定しています。
 
 ## ⚠️ 建築限界と「プレイヤーが居られる高さ」は別（重要）
 

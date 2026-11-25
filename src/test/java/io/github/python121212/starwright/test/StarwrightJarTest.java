@@ -243,4 +243,15 @@ class StarwrightJarTest {
             assertEquals("Starwright", json.get("itemGroup.starwright").getAsString());
         }
     }
+
+    @Test
+    @DisplayName("no dimension_type override: vanilla build limit is untouched")
+    void noDimensionTypeOverride() {
+        for (String entry : emulated.entries()) {
+            assertFalse(entry.startsWith("data/minecraft/dimension_type/"),
+                    "vanilla build limit must stay untouched: " + entry);
+            assertFalse(entry.startsWith("data/minecraft/dimension/"),
+                    "no custom dimension may be added: " + entry);
+        }
+    }
 }

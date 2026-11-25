@@ -130,4 +130,15 @@ class SpaceRulesTest {
         assertEquals(server.darkness(), client.darkness(), EPS);
         assertTrue(server.isSpace());
     }
+
+    @Test
+    @DisplayName("build limit stays vanilla: space begins beyond Y=319")
+    void buildLimitStaysVanilla() {
+        assertEquals(-64, SpaceTuning.VANILLA_MIN_BUILD_Y);
+        assertEquals(319, SpaceTuning.VANILLA_MAX_BUILD_Y);
+        assertTrue(SpaceTuning.SPACE_START_Y > SpaceTuning.VANILLA_MAX_BUILD_Y,
+                "space must be OUTSIDE the vanilla build limit");
+        assertEquals(SpaceStage.SPACE,
+                SpaceRules.stageForY(SpaceTuning.SPACE_START_Y));
+    }
 }

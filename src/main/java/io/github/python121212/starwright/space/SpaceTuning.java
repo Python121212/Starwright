@@ -25,6 +25,15 @@ public final class SpaceTuning {
     public static final int GROUND_RENDER_CUTOFF_Y = 4_200;
 
     /**
+     * DECIDED: the vanilla build limit stays untouched. We ship NO
+     * {@code data/minecraft/dimension_type/overworld.json} and no custom dimension.
+     * {@link #SPACE_START_Y} is therefore ABOVE the build limit - an entity
+     * position in a chunk-less region, not a place where blocks can be placed.
+     */
+    public static final int VANILLA_MIN_BUILD_Y = -64;
+    public static final int VANILLA_MAX_BUILD_Y = 319;
+
+    /**
      * Space is NOT a dimension: every altitude stays in the same Overworld.
      * No ServerLevel creation, no dimension transfer, no loading screen.
      */
