@@ -135,12 +135,13 @@ Step 2〜4 はクライアント描画に深入りするため、Mixin あるい
 | 開始高度 | `ASCENT_ARM_Y = 320`（= バニラ最大建築 Y 319 の 1 つ上）。**これ未満では何も触らない** |
 | 上昇 | **Y=320 を超えた時点で自動的に連続上昇**（追加入力なし。建築限界の外に出たら同じオーバーワールドがそのまま運ぶ） |
 | 下降 | スニーク長押し（`player.isShiftKeyDown()`。サーバーへ同期済みのバニラ入力） |
-| 停止 | **Y≥5,000 到達で自動停止**。`setNoGravity(true)` と相まって宇宙で浮く |
+| 停止 | **非クリエは Y≥5,000 到達で自動停止**。`setNoGravity(true)` と相まって宇宙で浮く |
+| **クリエイティブ飛行** | `getAbilities().flying` を検出。**宇宙到達後も飛行を継続**し、スペース／シフトで上昇・下降し続けられる。Y<320 の通常クリエ飛行は完全にバニラのまま |
 | 中断 | エリトラ飛行中はブーストしない（Y≥1,000 で `stopFallFlying()`） |
 | 最高速度 | `ASCENT_MAX_SPEED = 1.0 m/tick`（20 m/s） |
 | 加速度 | `ASCENT_ACCELERATION = 0.04 m/tick²`。開始直後はゆっくり、徐々に加速 |
 | 所要 tick | Y=320 → 5,000 に **4,700 tick 前後（約 4 分）**。全大気層を通り抜ける |
-| 適用 | `PlayerTickEvent(Phase.END)`・サーバー側のみ、`Entity#setDeltaMovement(x, vy, z)` |
+| 適用 | `PlayerTickEvent(Phase.START)`・サーバー側のみ、`Entity#setDeltaMovement(x, vy, z)` |
 
 ### 「連続」であることの担保
 
@@ -148,6 +149,9 @@ Step 2〜4 はクライアント描画に深入りするため、Mixin あるい
 - `teleportTo` / `setPos` / `absMoveTo` / `changeDimension` / `ServerLevel` 生成を**一切使わない**
 - 1 tick の変位は常に `≤ 1.0 m`。テストが軌跡の全 tick を検査し、飛び・逆走を検出
 - 水平速度 (`motion.x/z`) は保持、`fallDistance` はリセット（無重力→地上帰還時の落下ダメージ防止）
+- **`Phase.START` で適用**する。`Player#travel()` はクリエ飛行中に垂直速度をジャンプ／シフト入力から作り直すため、
+  その**前**に速度を入れないと上書きされてしまう。START ならバニラの飛行入力がそのまま上乗せされ、水平移動も自由なまま宇宙まで飛べる
+- クリエ飛行中は `ServerGamePacketListenerImpl` の浮遊判定対象外（サーバーが飛行を許可している）なので、高高度でも kick されない
 - エリトラ飛行中はブーストせず、Y≥1,000 で既存フックが `stopFallFlying()`（**エリトラでは宇宙へ行けない**）
 - Y<320 に戻ると機構が切れ、以降は**完全にバニラの重力・落下**に引き継ぐ
 
@@ -164,11 +168,12 @@ Step 2〜4 はクライアント描画に深入りするため、Mixin あるい
 - `SpaceRulesTest.java`（10 件）: 境界 4,999 / 5,000、ステージ順序、暗さ・星の単調増加、
   重力の単調減少、エリトラ禁止、地上描画カット判定、ディメンション移動がないこと、
   サーバー／クライアント分離、**建築限界バニラ維持**
-- `SpaceAscentRulesTest.java`（8 件）: 開始高度 320、バニラ入力の方向、エリトラ無ブースト、
-  速度クランプ、加速度上限、**Y=5,000 までの連続軌跡と全ステージ通過**、下降
-- `StarwrightJarTest.java`（17 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
-  **本番 jar の連続昇降エミュレーション**、擬似ゲームの全 tick 記録、
+- `SpaceAscentRulesTest.java`（9 件）: 開始高度 320、バニラ入力の方向、**クリエ飛行は宇宙でも上昇継続**、
+  エリトラ無ブースト、速度クランプ、加速度上限、**Y=5,000 までの連続軌跡と全ステージ通過**、下降
+- `StarwrightJarTest.java`（18 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
+  **本番 jar の連続昇降エミュレーション**、**本番 jar のクリエ飛行が宇宙でも上昇を返すこと**、
+  `Phase.START` でフックが動くこと、擬似ゲームの全 tick 記録、
   `SpaceAscentRules` が Minecraft 非依存であること、`ServerLevel` 参照が jar 全体に無いこと
 
-合計 **35 件**。`src/main` / `src/mockmc` / `src/test` を触っているため、
+合計 **37 件**。`src/main` / `src/test` を触っているため、
 前回決めた CI の発火条件どおり **ビルド＋エミュレーションテストが必ず走ります**。

@@ -18,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SpaceAscentRulesTest {
 
     private static final double EPS = 1e-9;
+    private static final boolean NOT_CREATIVE = false;
+    private static final boolean CREATIVE = true;
 
     @Test
     @DisplayName("ascent arms exactly one block above the vanilla build limit")
@@ -32,35 +34,51 @@ class SpaceAscentRulesTest {
     }
 
     @Test
-    @DisplayName("below the build limit nothing is changed - vanilla stays vanilla")
+    @DisplayName("below the build limit nothing is changed - creative flight stays vanilla")
     void belowBuildLimitNothingChanges() {
         for (double y : new double[] {-64, 0, 100, 319, 319.999}) {
-            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, false), EPS);
-            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, true, false), EPS);
+            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, false, NOT_CREATIVE), EPS);
+            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, true, false, NOT_CREATIVE), EPS);
+            assertEquals(0.0, SpaceAscentRules.targetSpeed(y, false, false, CREATIVE), EPS);
             assertEquals(0.0, SpaceAscentRules.stepTowards(0.0,
-                    SpaceAscentRules.targetSpeed(y, false, false)), EPS);
+                    SpaceAscentRules.targetSpeed(y, false, false, CREATIVE)), EPS);
         }
-        assertTrue(SpaceAscentRules.targetSpeed(320, false, false) > 0.0);
+        assertTrue(SpaceAscentRules.targetSpeed(320, false, false, CREATIVE) > 0.0);
     }
 
     @Test
     @DisplayName("continuous climb, sneak descent, and automatic stop on arrival in space")
     void climbDescentAndArrivalBehaviour() {
         double max = SpaceTuning.ASCENT_MAX_SPEED;
-        assertEquals(max, SpaceAscentRules.targetSpeed(400, false, false), EPS);
-        assertEquals(-max, SpaceAscentRules.targetSpeed(400, true, false), EPS);
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(5_000, false, false), EPS,
+        assertEquals(max, SpaceAscentRules.targetSpeed(400, false, false, NOT_CREATIVE), EPS);
+        assertEquals(-max, SpaceAscentRules.targetSpeed(400, true, false, NOT_CREATIVE), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(5_000, false, false, NOT_CREATIVE), EPS,
                 "reaching space must stop the climb so the player floats");
-        assertEquals(-max, SpaceAscentRules.targetSpeed(5_000, true, false), EPS,
+        assertEquals(-max, SpaceAscentRules.targetSpeed(5_000, true, false, NOT_CREATIVE), EPS,
                 "sneak must still allow descending out of space");
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(319, false, false), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(319, false, false, NOT_CREATIVE), EPS);
+    }
+
+    @Test
+    @DisplayName("creative flight keeps climbing freely from inside space")
+    void creativeFlightKeepsWorkingInSpace() {
+        double max = SpaceTuning.ASCENT_MAX_SPEED;
+        assertEquals(max, SpaceAscentRules.targetSpeed(5_000, false, false, CREATIVE), EPS,
+                "creative flight must not be cut off at the space boundary");
+        assertEquals(max, SpaceAscentRules.targetSpeed(9_000, false, false, CREATIVE), EPS);
+        assertEquals(-max, SpaceAscentRules.targetSpeed(9_000, true, false, CREATIVE), EPS,
+                "sneak still descends while creatively flying");
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(5_000, false, false, NOT_CREATIVE), EPS,
+                "non-creative arrival still settles into zero gravity");
+        assertTrue(SpaceAscentRules.isArmed(9_000));
     }
 
     @Test
     @DisplayName("elytra flight never receives an ascent boost")
     void elytraNeverGetsAnAscentBoost() {
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(400, false, true), EPS);
-        assertEquals(0.0, SpaceAscentRules.targetSpeed(4_000, true, true), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(400, false, true, NOT_CREATIVE), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(4_000, true, true, NOT_CREATIVE), EPS);
+        assertEquals(0.0, SpaceAscentRules.targetSpeed(4_000, false, true, CREATIVE), EPS);
         assertFalse(SpaceRules.isElytraAllowed(5_000));
     }
 
@@ -105,7 +123,7 @@ class SpaceAscentRulesTest {
         seen.add(SpaceRules.stageForY(y));
 
         while (y < SpaceTuning.SPACE_START_Y && ticks < 50_000) {
-            double target = SpaceAscentRules.targetSpeed(y, false, false);
+            double target = SpaceAscentRules.targetSpeed(y, false, false, NOT_CREATIVE);
             velocity = SpaceAscentRules.stepTowards(velocity, target);
             y += velocity;
 
@@ -140,7 +158,7 @@ class SpaceAscentRulesTest {
         int ticks = 0;
 
         while (y > SpaceTuning.ASCENT_ARM_Y + 1.0 && ticks < 50_000) {
-            double target = SpaceAscentRules.targetSpeed(y, true, false);
+            double target = SpaceAscentRules.targetSpeed(y, true, false, NOT_CREATIVE);
             velocity = SpaceAscentRules.stepTowards(velocity, target);
             y += velocity;
             assertTrue(Math.abs(velocity) <= SpaceTuning.ASCENT_MAX_SPEED + EPS);

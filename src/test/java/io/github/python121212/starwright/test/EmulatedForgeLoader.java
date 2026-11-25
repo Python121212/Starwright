@@ -61,6 +61,7 @@ public final class EmulatedForgeLoader {
             double maxDescentStep,
             boolean monotonicAscent,
             boolean descentReversed,
+            double creativeSpeedInSpace,
             List<Double> ascentTrace) {}
 
     /** Outcome of one emulated discovery + instantiation + ascent pass. */
@@ -206,7 +207,7 @@ public final class EmulatedForgeLoader {
         Class<?> rules = loader.loadClass(ASCENT_RULES_CLASS);
         Method isArmed = rules.getMethod("isArmed", double.class);
         Method targetSpeed = rules.getMethod("targetSpeed",
-                double.class, boolean.class, boolean.class);
+                double.class, boolean.class, boolean.class, boolean.class);
         Method stepTowards = rules.getMethod("stepTowards", double.class, double.class);
         Method recordAscent = mockmc.getMethod("recordAscent", double.class, double.class);
 
@@ -225,7 +226,7 @@ public final class EmulatedForgeLoader {
         while (y < spaceStartY && ascentTicks < MAX_EMULATED_TICKS) {
             boolean armed = (boolean) isArmed.invoke(null, y);
             double target = armed
-                    ? (double) targetSpeed.invoke(null, y, false, false)
+                    ? (double) targetSpeed.invoke(null, y, false, false, false)
                     : 0.0;
             velocity = (double) stepTowards.invoke(null, velocity, target);
             y += velocity; // the pseudo game applies the vanilla entity move
@@ -245,7 +246,7 @@ public final class EmulatedForgeLoader {
         while (y > armY + 1.0 && descentTicks < MAX_EMULATED_TICKS) {
             boolean armed = (boolean) isArmed.invoke(null, y);
             double target = armed
-                    ? (double) targetSpeed.invoke(null, y, true, false)
+                    ? (double) targetSpeed.invoke(null, y, true, false, false)
                     : 0.0;
             velocity = (double) stepTowards.invoke(null, velocity, target);
             y += velocity;
@@ -255,13 +256,17 @@ public final class EmulatedForgeLoader {
             recordAscent.invoke(null, y, velocity);
         }
 
+        // Creative flight must still return a climb speed from INSIDE space.
+        double creativeSpeedInSpace = (double) targetSpeed.invoke(
+                null, spaceStartY + 100.0, false, false, true);
+
         return new AscentEmulation(
                 armY, spaceY, y,
                 maxSpeed, spaceStartY,
                 ascentTicks, descentTicks,
                 maxAscentStep, maxDescentStep,
                 monotonicAscent, descentReversed,
-                List.copyOf(trace));
+                creativeSpeedInSpace, List.copyOf(trace));
     }
 
     private static void assertTrue(boolean condition, String message) {

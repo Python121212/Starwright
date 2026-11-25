@@ -19,8 +19,9 @@ package io.github.python121212.starwright.space;
  *
  * <p>No item, block, key binding, network packet or access transformer is added.
  * Once the player crosses the vanilla build limit the same Overworld simply
- * carries them upward; holding vanilla sneak descends; arriving in space stops
- * the climb so the player floats in zero gravity.</p>
+ * carries them upward; holding vanilla sneak descends. Creative flight keeps
+ * working at every altitude (including inside space), so a creative player can
+ * simply fly up through the sky.</p>
  */
 public final class SpaceAscentRules {
 
@@ -29,7 +30,7 @@ public final class SpaceAscentRules {
     /**
      * The continuous ascent is available only at/above the first Y outside the
      * vanilla build limit. Below that, vanilla behaviour is left completely
-     * untouched.
+     * untouched - including ordinary creative flight.
      */
     public static boolean isArmed(double y) {
         return y >= SpaceTuning.ASCENT_ARM_Y;
@@ -38,10 +39,12 @@ public final class SpaceAscentRules {
     /**
      * Desired vertical velocity in metres per tick.
      *
-     * @param sneak       vanilla sneak input held (server-synced by the game)
-     * @param fallFlying  true while elytra flight is active; never boosted
+     * @param sneak          vanilla sneak input held (server-synced by the game)
+     * @param fallFlying     true while elytra flight is active; never boosted
+     * @param creativeFlying true while the player is in creative flight
      */
-    public static double targetSpeed(double y, boolean sneak, boolean fallFlying) {
+    public static double targetSpeed(double y, boolean sneak, boolean fallFlying,
+                                     boolean creativeFlying) {
         if (!isArmed(y) || fallFlying) {
             return 0.0;
         }
@@ -49,8 +52,9 @@ public final class SpaceAscentRules {
         if (sneak) {
             return -SpaceTuning.ASCENT_MAX_SPEED;
         }
-        // Arrival: stop climbing and float in the zero-gravity state.
-        if (isSpace(y)) {
+        // Non-creative arrival settles into zero gravity. Creative flight keeps
+        // flying: the player may keep climbing freely from inside space.
+        if (isSpace(y) && !creativeFlying) {
             return 0.0;
         }
         return SpaceTuning.ASCENT_MAX_SPEED;

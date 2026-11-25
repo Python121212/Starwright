@@ -336,6 +336,8 @@ class StarwrightJarTest {
                 "the hook must ask the rules for a target velocity");
         assertTrue(hooksPool.contains("stepTowards"),
                 "the hook must smooth the velocity every tick");
+        assertTrue(hooksPool.contains("START"),
+                "the hook must run at Phase.START so creative flight cannot overwrite it");
         assertFalse(hooksPool.contains("net/minecraft/server/level/ServerLevel"),
                 "the hook must never create a ServerLevel or change dimension");
 
@@ -348,5 +350,14 @@ class StarwrightJarTest {
             assertFalse(pool.contains("net/minecraft/server/level/ServerLevel"),
                     entry + " must not create/transfer a dimension");
         }
+    }
+
+    @Test
+    @DisplayName("creative flight keeps climbing from inside space in the production jar")
+    void creativeFlightRemainsAvailableInSpace() {
+        EmulatedForgeLoader.AscentEmulation ascent = emulated.ascent();
+        assertEquals(ascent.maxSpeed(), ascent.creativeSpeedInSpace(), 1e-9,
+                "creative flight must still return a climb speed at Y > 5,000");
+        assertTrue(ascent.creativeSpeedInSpace() > 0.0);
     }
 }
