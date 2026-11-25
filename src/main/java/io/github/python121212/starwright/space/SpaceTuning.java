@@ -34,6 +34,19 @@ public final class SpaceTuning {
     public static final int VANILLA_MAX_BUILD_Y = 319;
 
     /**
+     * Continuous ascent/descent. It becomes available exactly ONE block above
+     * the vanilla build limit (the feet of a player standing on Y=319), so the
+     * ground game below that is completely untouched.
+     */
+    public static final int ASCENT_ARM_Y = VANILLA_MAX_BUILD_Y + 1; // 320
+
+    /** Vertical speed ceiling in metres per tick (1.0 m/tick = 20 m/s). */
+    public static final double ASCENT_MAX_SPEED = 1.0;
+
+    /** Largest velocity change allowed in one tick: no instantaneous jump. */
+    public static final double ASCENT_ACCELERATION = 0.04;
+
+    /**
      * Space is NOT a dimension: every altitude stays in the same Overworld.
      * No ServerLevel creation, no dimension transfer, no loading screen.
      */

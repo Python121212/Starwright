@@ -48,6 +48,15 @@ public final class MockMinecraft {
         EVENTS.add("eventbus:" + methodName);
     }
 
+    /**
+     * Records ONE emulated server tick of the continuous ascent. The pseudo game
+     * advances the player by the velocity returned from the production jar's
+     * SpaceAscentRules, so the whole climb to Y=5,000 is really simulated here.
+     */
+    public static void recordAscent(double y, double velocity) {
+        EVENTS.add(String.format("ascent:y=%.2f,vy=%.2f", y, velocity));
+    }
+
     /** Called by the emulated FML after it instantiates a mod. */
     public static void recordMod(String modId) {
         if (!ResourceLocation.isValidNamespace(modId)) {

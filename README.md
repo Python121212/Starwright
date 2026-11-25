@@ -24,7 +24,7 @@ src/main/resources/META-INF/mods.toml                          ... mod 定義・
 src/main/resources/pack.mcmeta                                 ... リソースパック情報
 src/mockmc/java/                                               ... 擬似マイクラ（フェイク実装一式）
 src/test/java/.../EmulatedForgeLoader.java                     ... 実 Forge ＋ 擬似マイクラで FML を再現
-src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（24 件）
+src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（35 件）
 build.gradle / settings.gradle / gradle.properties             ... ビルド定義（ルート）
 gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 wrapper
 .github/workflows/build-release.yml                          ... GitHub Actions（CI）
@@ -65,7 +65,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 5. 擬似マイクラの `MockMinecraft` に mod を登録し、起動／ログ／登録の記録を回収
 6. ログをキャプチャして `[MockMC] Booting pseudo Minecraft 1.20.1` と `[Starwright] Loaded successfully` を確認
 
-### 検証項目（JUnit 24 件）
+### 検証項目（JUnit 35 件）
 
 | 種別 | 内容 |
 | --- | --- |
@@ -84,7 +84,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 | --- | --- |
 | Forge 1.20.1 (47.2.0) / Gradle 8.1.1 / JDK 17 | ✅ ビルド定義済み |
 | 読み込みだけの jar → GitHub Releases | ✅ `v1.0.0` |
-| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 24 件 |
+| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 35 件 |
 | CI の発火条件 | ✅ jar 入力／本題の変更のみ。ドキュメントのみは無発火 |
 | **mod イベントバスの注入** | ✅ `Starwright(IEventBus)` — FML が本物のバスを渡す |
 | **`net.minecraftforge.*` はすべて本物** | ✅ エミュレータが test classpath の Forge jar から供給（`@Mod` だけでなく `IEventBus` 等も） |
@@ -116,7 +116,11 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 - **地上の描画はクライアント側で完全にカット**する判定を用意。**サーバー側は別**で、地上の tick や判定は止めません
 - **建築限界はバニラのまま**（Y = −64〜319 を変更しない）。`dimension_type` の上書きやディメンション追加は行わず、Y = 5,000 は建築限界の外側にあるエンティティ座標として扱います
 
-現在は判定ロジック（`space` パッケージ）・サーバー側フック・クライアント側状態・テストまで実装済みです。
+- **Y=5,000 への連続昇降を実装**。建築限界の 1 つ上 (Y=320) から、ジャンプ長押しで上昇・スニーク長押しで下降します。
+  テレポート／`setPos`／ディメンション移動は一切使わず、毎 tick `setDeltaMovement` で速度だけを与えます（最高 1.0 m/tick、約 4 分で到達）。
+  アイテム・ブロック・キー登録の追加はありません。Y<320 は完全にバニラのままです。
+
+判定ロジック（`space` パッケージ）・サーバー側フック・クライアント側状態・連続昇降・テストまで実装済みです。
 空の描画・星の増加・`LevelRenderer` の描画カットは `docs/SPACE.md` のロードマップどおり次のステップです。
 
 ## 導入

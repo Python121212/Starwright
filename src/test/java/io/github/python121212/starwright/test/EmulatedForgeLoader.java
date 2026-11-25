@@ -30,13 +30,17 @@ import java.util.regex.Pattern;
  *       in {@code src/mockmc}.</li>
  *   <li><b>Minecraft is a pseudo runtime.</b> {@code src/mockmc/java} provides fake
  *       {@code net.minecraft.*}, {@code com.mojang.logging.*} and {@code org.slf4j.*}
- *       classes, plus {@code MockMinecraft} which records bootstrap, logs and mod
- *       registration. If the mod needs a Minecraft class that is not implemented,
- *       the loader fails with an explicit message instead of silently using the
- *       real one.</li>
+ *       classes, plus {@code MockMinecraft} which records bootstrap, logs, mod
+ *       registration and every tick of the continuous ascent. If the mod needs a
+ *       Minecraft class that is not implemented, the loader fails with an
+ *       explicit message instead of silently using the real one.</li>
  *   <li>The built (re-obfuscated) mod jar is loaded for real. FML's constructor
- *       injection is emulated by passing a proxy of the <b>real</b> Forge mod event
- *       bus.</li>
+ *       injection is emulated by passing a proxy of the <b>real</b> Forge mod
+ *       event bus.</li>
+ *   <li>The continuous-ascent rules are loaded from the PRODUCTION jar and
+ *       ticked for real inside the pseudo game until Y=5,000 is reached and the
+ *       player descends again. Those rules are Minecraft-independent, so they
+ *       survive {@code reobfJar} without any name remapping.</li>
  * </ul>
  *
  * <p>The class loader's parent is {@code null} (bootstrap only), so the real
@@ -44,7 +48,22 @@ import java.util.regex.Pattern;
  */
 public final class EmulatedForgeLoader {
 
-    /** Outcome of one emulated discovery + instantiation pass. */
+    /** Result of one full tick-by-tick continuous ascent/descent emulation. */
+    public record AscentEmulation(
+            double startY,
+            double spaceY,
+            double returnY,
+            double maxSpeed,
+            double spaceStartY,
+            int ascentTicks,
+            int descentTicks,
+            double maxAscentStep,
+            double maxDescentStep,
+            boolean monotonicAscent,
+            boolean descentReversed,
+            List<Double> ascentTrace) {}
+
+    /** Outcome of one emulated discovery + instantiation + ascent pass. */
     public record Result(
             String modId,
             String modAnnotationType,
@@ -56,12 +75,18 @@ public final class EmulatedForgeLoader {
             List<String> pseudoMinecraftEvents,
             List<String> loadedMods,
             List<String> entries,
-            List<String> constructorParameterTypes) {}
+            List<String> constructorParameterTypes,
+            AscentEmulation ascent) {}
 
     private static final String MOD_ANNOTATION = "net.minecraftforge.fml.common.Mod";
     private static final String MAIN_CLASS = "io.github.python121212.starwright.Starwright";
     private static final String MOCKMC_CLASS =
             "io.github.python121212.starwright.mockmc.MockMinecraft";
+    private static final String TUNING_CLASS =
+            "io.github.python121212.starwright.space.SpaceTuning";
+    private static final String ASCENT_RULES_CLASS =
+            "io.github.python121212.starwright.space.SpaceAscentRules";
+    private static final int MAX_EMULATED_TICKS = 50_000;
 
     private EmulatedForgeLoader() {}
 
@@ -128,6 +153,10 @@ public final class EmulatedForgeLoader {
 
             // Emulate FML registering the discovered mod in the pseudo game.
             mockmc.getMethod("recordMod", String.class).invoke(null, modId);
+
+            // Emulate the real server ticks that carry the player to space.
+            AscentEmulation ascent = runAscentEmulation(loader, mockmc);
+
             boolean bootstrapped = (boolean) mockmc.getMethod("isBootstrapped").invoke(null);
             List<String> events = copyStrings(mockmc.getMethod("events").invoke(null));
             List<String> loaded = copyStrings(mockmc.getMethod("loadedMods").invoke(null));
@@ -136,6 +165,11 @@ public final class EmulatedForgeLoader {
             original.println("[emulated FML] " + MAIN_CLASS + " -> @Mod(\"" + modId + "\")");
             original.println("[emulated FML] constructor args: " + paramTypes);
             original.println("[emulated FML] " + log);
+            original.println("[emulated FML] continuous ascent: " + ascent.ascentTicks()
+                    + " ticks to Y=" + String.format("%.1f", ascent.spaceY())
+                    + ", max step " + String.format("%.2f", ascent.maxAscentStep())
+                    + " m/tick, descended back to Y=" + String.format("%.1f", ascent.returnY())
+                    + " in " + ascent.descentTicks() + " ticks");
 
             return new Result(
                     modId,
@@ -148,9 +182,91 @@ public final class EmulatedForgeLoader {
                     events,
                     loaded,
                     List.copyOf(loader.jarEntries()),
-                    paramTypes);
+                    paramTypes,
+                    ascent);
         } finally {
             loader.closeJar();
+        }
+    }
+
+    /**
+     * Loads {@link #ASCENT_RULES_CLASS} and {@link #TUNING_CLASS} straight out
+     * of the PRODUCTION jar and ticks them inside the pseudo Minecraft runtime.
+     * Every tick records the resulting altitude, so a teleport (a step larger
+     * than ASCENT_MAX_SPEED) or a non-monotonic climb is impossible to hide.
+     */
+    private static AscentEmulation runAscentEmulation(
+            ForgeBackedLoader loader, Class<?> mockmc) throws Exception {
+
+        Class<?> tuning = loader.loadClass(TUNING_CLASS);
+        double armY = tuning.getField("ASCENT_ARM_Y").getInt(null);
+        double maxSpeed = tuning.getField("ASCENT_MAX_SPEED").getDouble(null);
+        double spaceStartY = tuning.getField("SPACE_START_Y").getInt(null);
+
+        Class<?> rules = loader.loadClass(ASCENT_RULES_CLASS);
+        Method isArmed = rules.getMethod("isArmed", double.class);
+        Method targetSpeed = rules.getMethod("targetSpeed",
+                double.class, boolean.class, boolean.class, boolean.class);
+        Method stepTowards = rules.getMethod("stepTowards", double.class, double.class);
+        Method recordAscent = mockmc.getMethod("recordAscent", double.class, double.class);
+
+        assertTrue(maxSpeed > 0.0, "ASCENT_MAX_SPEED must be positive");
+        assertTrue(spaceStartY > armY, "space must be above the vanilla build limit");
+
+        double y = armY;
+        double velocity = 0.0;
+        int ascentTicks = 0;
+        double maxAscentStep = 0.0;
+        boolean monotonicAscent = true;
+        List<Double> trace = new ArrayList<>();
+        trace.add(y);
+
+        // Hold jump: rise continuously until the real Y=5,000 boundary.
+        while (y < spaceStartY && ascentTicks < MAX_EMULATED_TICKS) {
+            boolean armed = (boolean) isArmed.invoke(null, y);
+            double target = armed
+                    ? (double) targetSpeed.invoke(null, y, true, false, false)
+                    : 0.0;
+            velocity = (double) stepTowards.invoke(null, velocity, target);
+            y += velocity; // the pseudo game applies the vanilla entity move
+            double step = Math.abs(velocity);
+            maxAscentStep = Math.max(maxAscentStep, step);
+            if (velocity < -1e-9) monotonicAscent = false;
+            trace.add(y);
+            ascentTicks++;
+            recordAscent.invoke(null, y, velocity);
+        }
+        double spaceY = y;
+
+        // Hold sneak: descend continuously back towards the build limit.
+        int descentTicks = 0;
+        double maxDescentStep = 0.0;
+        boolean descentReversed = false;
+        while (y > armY + 1.0 && descentTicks < MAX_EMULATED_TICKS) {
+            boolean armed = (boolean) isArmed.invoke(null, y);
+            double target = armed
+                    ? (double) targetSpeed.invoke(null, y, false, true, false)
+                    : 0.0;
+            velocity = (double) stepTowards.invoke(null, velocity, target);
+            y += velocity;
+            maxDescentStep = Math.max(maxDescentStep, Math.abs(velocity));
+            if (velocity < 0.0) descentReversed = true;
+            descentTicks++;
+            recordAscent.invoke(null, y, velocity);
+        }
+
+        return new AscentEmulation(
+                armY, spaceY, y,
+                maxSpeed, spaceStartY,
+                ascentTicks, descentTicks,
+                maxAscentStep, maxDescentStep,
+                monotonicAscent, descentReversed,
+                List.copyOf(trace));
+    }
+
+    private static void assertTrue(boolean condition, String message) {
+        if (!condition) {
+            throw new AssertionError(message);
         }
     }
 

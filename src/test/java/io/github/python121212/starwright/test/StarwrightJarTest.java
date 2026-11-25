@@ -3,6 +3,7 @@ package io.github.python121212.starwright.test;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.moandjiezana.toml.Toml;
+import io.github.python121212.starwright.space.SpaceTuning;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,16 @@ class StarwrightJarTest {
             assertNotNull(entry, "jar entry missing: " + name);
             try (InputStream in = jarFile.getInputStream(entry)) {
                 return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        }
+    }
+
+    private static byte[] readClassBytes(String name) throws IOException {
+        try (JarFile jarFile = new JarFile(jar.toFile())) {
+            JarEntry entry = jarFile.getJarEntry(name);
+            assertNotNull(entry, "jar entry missing: " + name);
+            try (InputStream in = jarFile.getInputStream(entry)) {
+                return in.readAllBytes();
             }
         }
     }
@@ -252,6 +263,82 @@ class StarwrightJarTest {
                     "vanilla build limit must stay untouched: " + entry);
             assertFalse(entry.startsWith("data/minecraft/dimension/"),
                     "no custom dimension may be added: " + entry);
+        }
+    }
+
+    @Test
+    @DisplayName("production jar climbs to Y=5,000 continuously, without a teleport")
+    void productionJarAscentIsContinuous() {
+        EmulatedForgeLoader.AscentEmulation ascent = emulated.ascent();
+        assertEquals(SpaceTuning.ASCENT_ARM_Y, ascent.startY(), 1e-9);
+        assertEquals(5_000.0, ascent.spaceStartY(), 1e-9);
+        assertTrue(ascent.spaceY() >= ascent.spaceStartY(),
+                "the emulation must actually reach space");
+        assertTrue(ascent.monotonicAscent(), "altitude must never jump backwards");
+        assertTrue(ascent.descentReversed(), "sneak must reverse the climb");
+        assertTrue(ascent.returnY() < ascent.spaceY(), "descent must return from space");
+        assertTrue(ascent.maxAscentStep() <= ascent.maxSpeed() + 1e-9,
+                "a step larger than the velocity ceiling is a teleport");
+        assertTrue(ascent.maxDescentStep() <= ascent.maxSpeed() + 1e-9);
+        assertTrue(ascent.ascentTicks()
+                        >= (ascent.spaceStartY() - ascent.startY()) / ascent.maxSpeed(),
+                "climbing faster than the speed ceiling would not be continuous");
+        assertEquals(ascent.ascentTicks() + 1, ascent.ascentTrace().size());
+
+        for (int i = 1; i < ascent.ascentTrace().size(); i++) {
+            double step = ascent.ascentTrace().get(i) - ascent.ascentTrace().get(i - 1);
+            assertTrue(step >= -1e-9 && step <= ascent.maxSpeed() + 1e-9,
+                    "discontinuous altitude change at tick " + i + ": " + step);
+        }
+    }
+
+    @Test
+    @DisplayName("pseudo Minecraft emulated every tick of the continuous ascent")
+    void pseudoMinecraftEmulatedEveryAscentTick() {
+        long ascentEvents = emulated.pseudoMinecraftEvents().stream()
+                .filter(event -> event.startsWith("ascent:"))
+                .count();
+        assertEquals(emulated.ascent().ascentTicks() + emulated.ascent().descentTicks(),
+                ascentEvents, "every server tick must be recorded by the pseudo game");
+        assertTrue(ascentEvents > 5_000, "the climb must take thousands of real ticks");
+        assertTrue(emulated.pseudoMinecraftEvents().stream()
+                        .anyMatch(event -> event.startsWith("ascent:y=")
+                                && event.contains("vy=")),
+                "pseudo game should record altitude and velocity per tick");
+    }
+
+    @Test
+    @DisplayName("ascent rules in the jar stay Minecraft-independent and are wired into the hook")
+    void ascentRulesArePureJavaAndHookedIn() throws Exception {
+        String rulesPool = new String(readClassBytes(
+                        "io/github/python121212/starwright/space/SpaceAscentRules.class"),
+                StandardCharsets.ISO_8859_1);
+        assertTrue(rulesPool.contains("SpaceTuning"));
+        assertTrue(rulesPool.contains("targetSpeed"));
+        assertTrue(rulesPool.contains("stepTowards"));
+        assertFalse(rulesPool.contains("net/minecraft"),
+                "ascent rules must not reference Minecraft classes (reobf-safe)");
+        assertFalse(rulesPool.contains("net/minecraftforge"),
+                "ascent rules must stay emulator-safe");
+
+        String hooksPool = new String(readClassBytes(
+                        "io/github/python121212/starwright/space/SpaceForgeHooks.class"),
+                StandardCharsets.ISO_8859_1);
+        assertTrue(hooksPool.contains("SpaceAscentRules"));
+        assertTrue(hooksPool.contains("isArmed"));
+        assertTrue(hooksPool.contains("targetSpeed"));
+        assertTrue(hooksPool.contains("stepTowards"));
+        assertFalse(hooksPool.contains("net/minecraft/server/level/ServerLevel"),
+                "the hook must never create a ServerLevel or change dimension");
+
+        // No class in the whole production jar may reference a server level.
+        for (String entry : emulated.entries()) {
+            if (!entry.endsWith(".class")) {
+                continue;
+            }
+            String pool = new String(readClassBytes(entry), StandardCharsets.ISO_8859_1);
+            assertFalse(pool.contains("net/minecraft/server/level/ServerLevel"),
+                    entry + " must not create/transfer a dimension");
         }
     }
 }
