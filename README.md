@@ -28,7 +28,7 @@ docs/SPACE.md / docs/SHIP.md                                   ... 宇宙 / 船�
 src/main/resources/pack.mcmeta                                 ... リソースパック情報
 src/mockmc/java/                                               ... 擬似マイクラ（フェイク実装一式）
 src/test/java/.../EmulatedForgeLoader.java                     ... 実 Forge ＋ 擬似マイクラで FML を再現
-src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（35 件）
+src/test/java/.../StarwrightJarTest.java                       ... jar 検証 JUnit テスト（37 件）
 build.gradle / settings.gradle / gradle.properties             ... ビルド定義（ルート）
 gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 wrapper
 .github/workflows/build-release.yml                          ... GitHub Actions（CI）
@@ -45,7 +45,7 @@ gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 w
 ```
 
 `build` 一発で **jar 生成とテストが一緒に**走ります。
-成果物は `build/libs/starwright-1.1.2.jar`（`reobfJar` 済みの本番用 jar）。
+成果物は `build/libs/starwright-1.2.0.jar`（`reobfJar` 済みの本番用 jar）。
 テストだけ実行したい場合は `./gradlew test`、開発環境で起動したい場合は `./gradlew runClient` / `./gradlew runServer` を使えます。
 
 ## Forge を使用したエミュレーション ＋ 擬似マイクラ
@@ -69,7 +69,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 5. 擬似マイクラの `MockMinecraft` に mod を登録し、起動／ログ／登録の記録を回収
 6. ログをキャプチャして `[MockMC] Booting pseudo Minecraft 1.20.1` と `[Starwright] Loaded successfully` を確認
 
-### 検証項目（JUnit 74 件）
+### 検証項目（JUnit 76 件）
 
 | 種別 | 内容 |
 | --- | --- |
@@ -87,8 +87,8 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 | 項目 | 状態 |
 | --- | --- |
 | Forge 1.20.1 (47.2.0) / Gradle 8.1.1 / JDK 17 | ✅ ビルド定義済み |
-| 初期版 → 起動不可 → タブ未追加 → 最新版 | ✅ `v1.0.0` → `v1.1.0`（不可）→ `v1.1.1` → **`v1.1.2`** |
-| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 74 件 |
+| 初期版 → 起動不可 → タブ未追加 → 旧船化 → 最新版 | ✅ `v1.0.0` → `v1.1.0`（不可）→ `v1.1.1` → `v1.1.2` → **`v1.2.0`** |
+| 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 76 件 |
 | CI の発火条件 | ✅ jar 入力／本題の変更のみ。ドキュメントのみは無発火 |
 | **FML が要求するコンストラクタ** | ✅ **引数なし**。`IEventBus` 注入は Forge 1.20.1 では不可（実機で `NoSuchMethodException`） |
 | **`net.minecraftforge.*` はすべて本物** | ✅ エミュレータが test classpath の Forge jar から供給（`@Mod`, `RegisterEvent`, `EventBusSubscriber` 等） |
@@ -140,21 +140,22 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 
 ## 本題: 船（Ship）
 
-仕様は **[docs/SHIP.md](docs/SHIP.md)** にまとめています。
+仕様は **[docs/SHIP.md](docs/SHIP.md)** にまとめています。**Create: Aeronautics を参考にしつつ、依存なしの自前実装**です。
 
-- **コアブロック**を、自分で建てた**空中に浮いている**構造のどこかに置くと、構造全体が **1 つの `ShipEntity` に所有**されて船になります。
-  地面や別の建造物に接している場合は船化しません（コアは普通のブロックとして残ります）。
-- **レンチ**の **シフト右クリック**で、船化したときにくっついてきた不要なブロックを掘って外せます。コアは外せません。
-  **通常右クリック**で船を 1 ブロック進めます（向いている方向・1 軸のみ）。
+- **物理アセンブラ** `physics_assembler` … 自分で建てた**空中に浮いている**構造のどこかに置くと、
+  構造全体が **1 つの `ShipEntity`** になります（**旧コアブロック／レンチは削除**）。
+  **シフト右クリック**で不要なブロックを除去、**通常右クリック**で 1 ブロック前進。
+- **プロペラ軸受** `propeller_bearing` … 向いている方向へ前進、**熱気バーナー** `hot_air_burner` … 上昇、
+  **スチームベント** `steam_vent` … 下降。3 つとも `ShipControlBlock` 1 クラスで実装。
+- **レヴィタイト** `levitite` / **飛行士ゴーグル** `aviators_goggles` … CA 由来の役割を自前で追加したアイテム。
+- 6 つとも **Starwright 専用クリエイティブタブ**（`itemGroup.starwright`、アイコンは物理アセンブラ）に並びます。
+- **テクスチャは 6 枚すべてオリジナルの 16×16 ピクセルアート**。鉄インゴット／鉄ブロックの流用はやめました。
 - 船になったあとも **内部にブロックを置く／歩く／チェストを開く／なんでもできます**。
   ブロックは `Level` に残るので、バニラの相互作用を 1 つも再実装していません。
-- **独自エンジンで Create Aeronautics より軽量**: 物理演算・回転・衝突ソルバ・仮想レベル・船メッシュは **0**。
+- **独自エンジンで軽量**: 物理演算・回転・衝突ソルバ・仮想レベル・船メッシュは **0**。
   毎 tick の処理は無く、移動は「クリック 1 回 = 1 ブロック」のバッチ移送だけです（チェスト等は NBT で運びます）。
-  `ShipEntity` のレンダラは描画を一切しない `NoopShipRenderer`（ドローコール 0）。
-- **Starwright 専用のクリエイティブタブ** (`itemGroup.starwright`) に **レンチ** と **コアブロック** を登録。
-  アイコンはレンチ。アイテムはレジストリから遅延取得するので登録順序に依存しません（レシピ／`data/**` は未追加）。
-- **Create / Create Aeronautics / flywheel / AstroDock の船は不使用**。依存は Forge だけの単独 mod です。
-  モデル 3 個・blockstate 1 個・PNG 0 個と最小構成です。
+- **Create / Create Aeronautics / flywheel / AstroDock のコード・アセット・依存は一切不使用**（Forge だけの単独 mod）。
+  モデル 10 個・blockstate 4 個・PNG 6 個、すべて自前。レシピ／`data/**` は未追加です。
 
 ## 導入
 
@@ -189,15 +190,15 @@ jar はリポジトリにコミットしないため、「jar が更新された
 リリースを出す手順:
 
 ```bash
-git tag v1.1.2
-git push origin v1.1.2
+git tag v1.2.0
+git push origin v1.2.0
 ```
 
-Actions の完了後、Releases に `starwright-1.1.2.jar` が添付されます。
+Actions の完了後、Releases に `starwright-1.2.0.jar` が添付されます。
 
-> **`v1.0.0` は初期版、`v1.1.0` は `@Mod` コンストラクタの不具合で起動不可、`v1.1.1` はクリエイティブタブ未追加です。**
-> 最新版は **`v1.1.2`** を使ってください:
-> `https://github.com/Python121212/Starwright/releases/download/v1.1.2/starwright-1.1.2.jar`
+> **`v1.0.0` は初期版、`v1.1.0` は起動不可、`v1.1.1` はタブ未追加、`v1.1.2` は旧レンチ／コアブロック版です。**
+> 最新版は **`v1.2.0`** を使ってください:
+> `https://github.com/Python121212/Starwright/releases/download/v1.2.0/starwright-1.2.0.jar`
 
 ## 実機で見つかった不具合と修正（v1.1.1）
 
@@ -224,7 +225,7 @@ Actions の完了後、Releases に `starwright-1.1.2.jar` が添付されます
 | Gradle | 8.1.1 |
 | Java | 17 |
 | JUnit | 5.10.2 |
-| mod version | 1.1.2 |
+| mod version | 1.2.0 |
 
 ---
 

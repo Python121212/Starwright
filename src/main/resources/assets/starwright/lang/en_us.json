@@ -1,7 +1,10 @@
 {
   "itemGroup.starwright": "Starwright",
-  "block.starwright.core_block": "Core Block",
-  "item.starwright.core_block": "Core Block",
-  "item.starwright.wrench": "Wrench",
+  "block.starwright.physics_assembler": "Physics Assembler",
+  "block.starwright.propeller_bearing": "Propeller Bearing",
+  "block.starwright.hot_air_burner": "Hot Air Burner",
+  "block.starwright.steam_vent": "Steam Vent",
+  "item.starwright.levitite": "Levitite",
+  "item.starwright.aviators_goggles": "Aviator's Goggles",
   "entity.starwright.ship": "Ship"
 }

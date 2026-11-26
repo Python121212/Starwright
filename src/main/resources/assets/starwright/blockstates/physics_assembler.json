@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "starwright:block/physics_assembler"
+    }
+  }
+}

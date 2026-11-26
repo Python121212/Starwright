@@ -1,34 +1,35 @@
 package io.github.python121212.starwright.ship;
 
 /**
- * Decides what a wrench click means - and, just as importantly, what it does
- * NOT mean. Everything that is not an explicit wrench action falls through to
- * vanilla, which is why placing blocks, walking and opening chests keep working
- * after the structure becomes a ship.
+ * Decides what a click on a ship block means - and, just as importantly, what
+ * it does NOT mean. There is no wrench any more: the Physics Assembler and the
+ * three control blocks handle everything. Everything else falls through to
+ * vanilla, which is why placing blocks, walking and opening chests keep working.
  */
 public final class ShipInteractionRules {
 
     private ShipInteractionRules() {}
 
-    /** Shift + right click with the wrench removes an accidentally attached block. */
-    public static boolean isWrenchDetach(boolean shiftHeld, boolean holdingWrench,
-                                         boolean targetInShip, boolean targetIsCore) {
-        return shiftHeld && holdingWrench && targetInShip && !targetIsCore;
+    /** Shift + right click on the Physics Assembler removes an extra block. */
+    public static boolean isAssemblerDetach(boolean shiftHeld,
+                                            boolean targetInShip,
+                                            boolean targetIsCore) {
+        return shiftHeld && targetInShip && !targetIsCore;
     }
 
-    /** Plain right click with the wrench nudges the ship one block. */
-    public static boolean isWrenchAdvance(boolean shiftHeld, boolean holdingWrench,
-                                          boolean targetInShip) {
-        return !shiftHeld && holdingWrench && targetInShip;
+    /** Plain right click on the Physics Assembler nudges the ship forward. */
+    public static boolean isAssemblerAdvance(boolean shiftHeld, boolean targetInShip) {
+        return !shiftHeld && targetInShip;
     }
 
-    /**
-     * True when the click must be handed straight back to Minecraft. Chests,
-     * doors, furnaces, block placement and walking all take this path - the
-     * ship engine never reimplements a single interaction.
-     */
-    public static boolean isVanillaPassthrough(boolean holdingWrench, boolean targetInShip) {
-        return !holdingWrench || !targetInShip;
+    /** A control block always advances on its own axis when clicked. */
+    public static boolean isControlAdvance(boolean targetInShip) {
+        return targetInShip;
+    }
+
+    /** True when the click must be handed straight back to Minecraft. */
+    public static boolean isVanillaPassthrough(boolean targetInShip) {
+        return !targetInShip;
     }
 
     public static boolean coreIsProtected(boolean targetIsCore) {
