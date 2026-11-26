@@ -120,7 +120,8 @@ Minecraft に返します。ブロックが実レベルに残っているため�
 - `StarwrightJarTest.java`（35 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
   **13 個の船クラスが jar に入っていること**、**エンジンが pure Java であること**、
   **`simibubi` / `createaeronautics` / `flywheel` が class・manifest・エントリ名のどこにも無いこと**、
-  **モデル 3 個 / PNG 0 個**、**日本語・英語の表示名**、**本番 jar の船化エミュレーション**、
+  **モデル 3 個 / PNG 0 個**、**日本語・英語の表示名**、**専用クリエイティブタブの登録と翻訳**、
+  **本番 jar の船化エミュレーション**、
   擬似マイクラの `ship:` 記録
 
 `src/main` / `src/test` を触っているため、選択的 CI の条件どおり
