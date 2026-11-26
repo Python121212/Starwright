@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "package": "io.github.python121212.starwright.space.client.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "minVersion": "0.8",
+  "client": [
+    "SpaceLevelRendererMixin"
+  ]
+}

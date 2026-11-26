@@ -1,0 +1,161 @@
+plugins {
+    id 'java'
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+// Minecraft 1.20.1 / Forge 47.x requires Java 17.
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    // AstroDock の成功例と同じ方式。バニラの搭乗入力パケットが持つ jumping を
+    // public にするだけで、追加の通信・アイテム無しに上昇入力を読める。
+    accessTransformer = file("src/main/resources/META-INF/accesstransformer.cfg")
+    mappings channel: mapping_channel, version: mapping_version
+    copyIdeResources = true
+
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.consolelevel', 'debug'
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+        client {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+        server {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+        data {
+            args '--mod', mod_id, '--all',
+                 '--output', file('src/generated/resources/').getAbsolutePath(),
+                 '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+// "Pseudo Minecraft": fake net.minecraft.* / com.mojang.* / org.slf4j.* classes
+// used by the emulator. It is compiled against the JDK ONLY so that no real
+// Minecraft or Forge class can accidentally satisfy one of these names.
+// Forge itself is never faked - the real @Mod bytecode is injected at test time.
+sourceSets {
+    mockmc {
+        java.srcDir 'src/mockmc/java'
+        compileClasspath = files()
+        runtimeClasspath = files() + output
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // Jar emulation tests (see src/test/java/.../EmulatedForgeLoader.java).
+    // They use the real Forge @Mod annotation + the pseudo Minecraft runtime,
+    // and never launch Minecraft.
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'com.moandjiezana.toml:toml4j:0.7.2'
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Replace ${...} placeholders in mods.toml / pack.mcmeta with gradle.properties values.
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_version       : minecraft_version,
+            minecraft_version_range : minecraft_version_range,
+            forge_version          : forge_version,
+            forge_version_range    : forge_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description,
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'      : mod_id,
+                'Specification-Vendor'     : mod_authors,
+                'Specification-Version'    : '1',
+                'Implementation-Title'     : mod_name,
+                'Implementation-Version'   : project.version,
+                'Implementation-Vendor'    : mod_authors,
+                'Implementation-Timestamp' : new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                // Forge 1.20.1 discovers mixin configs from the jar manifest,
+                // NOT from [[mixins]] in mods.toml. No MixinGradle/refmap needed.
+                'MixinConfigs'            : 'starwright.mixins.json',
+        ])
+    }
+    // Produce a production (re-obfuscated) jar, not a dev-only jar.
+    finalizedBy 'reobfJar'
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+// `build` runs `check` -> `test`, so a single ./gradlew build produces the jar
+// and verifies it. The emulation tests read the production jar and the compiled
+// pseudo Minecraft classes, hence the explicit task dependencies.
+//
+// CI invokes this job only when jar inputs (src/main/**, build definition) or the
+// emulation harness change. The exact path filter lives in
+// .github/workflows/build-release.yml; README/docs-only changes never trigger it.
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    dependsOn 'reobfJar', 'mockmcClasses'
+    systemProperty 'starwright.jar',
+            project.layout.buildDirectory.file("libs/${mod_id}-${mod_version}.jar").get().asFile.absolutePath
+    systemProperty 'starwright.mockmc', sourceSets.mockmc.output.classesDirs.asPath
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = true
+        exceptionFormat = 'full'
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

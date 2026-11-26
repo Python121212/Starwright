@@ -1,0 +1,152 @@
+name: Build and Release
+
+on:
+  # The jar emulation + tests are MANDATORY only when the jar can change
+  # (mod sources, item/block additions, build definition) or when the emulation
+  # harness itself changes. Everything else - README, .github/**, .gitignore,
+  # .gitattributes, docs - must NOT trigger a build at all.
+  #
+  # Built jars are never committed (they live in GitHub Releases), so "jar was
+  # updated" is expressed as a path filter over everything that produces a jar.
+  #
+  # GitHub does NOT evaluate `paths` for tag pushes, so `v*` tags always run the
+  # full build + emulation tests before the Release is published.
+  push:
+    branches:
+      - main
+      - 'arena/**'
+    paths:
+      - 'src/main/**'
+      - 'src/test/**'
+      - 'src/mockmc/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'gradle/wrapper/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/main/**'
+      - 'src/test/**'
+      - 'src/mockmc/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'gradle/wrapper/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+  # Manual runs are never automatic; they are an explicit opt-in.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, emulate and release
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # `build` runs `assemble` (jar + reobfJar) and `check` (JUnit emulation
+      # tests) in one invocation, so the jar and its verification ship together.
+      - name: Build jar and run emulation tests
+        run: ./gradlew build --no-daemon --stacktrace
+
+      - name: Summarize emulation tests
+        if: always()
+        run: |
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob
+          import sys
+          import xml.etree.ElementTree as ET
+
+          files = sorted(glob.glob("build/test-results/test/TEST-*.xml"))
+          print("### Jar emulation tests\n")
+          if not files:
+              print("_No JUnit report was produced._")
+          else:
+              totals = dict(tests=0, failures=0, errors=0, skipped=0)
+              cases = []
+              for path in files:
+                  root = ET.parse(path).getroot()
+                  for key in totals:
+                      totals[key] += int(root.get(key, "0"))
+                  for case in root.findall("testcase"):
+                      node = case.find("failure")
+                      if node is None:
+                          node = case.find("error")
+                      bad = node is not None
+                      cls = case.get("classname", "")
+                      name = case.get("name", "")
+                      cases.append((bad, cls, name))
+                      if bad:
+                          detail = (node.get("message") or node.text or "").strip()
+                          first = detail.splitlines()[0][:300] if detail else "(no message)"
+                          # Surface the reason as a run annotation. Actions log /
+                          # artifact blobs are not reachable from the sandbox, so
+                          # the JUnit XML must be reduced to an annotation here.
+                          print(f"::error file={path}::{cls} / {name}: {first}", file=sys.stderr)
+              ok = totals["failures"] == 0 and totals["errors"] == 0
+              print(f"**{'passed' if ok else 'FAILED'}**\n")
+              print("| tests | failures | errors | skipped |")
+              print("| --- | --- | --- | --- |")
+              print(f"| {totals['tests']} | {totals['failures']} | {totals['errors']} | {totals['skipped']} |\n")
+              for bad, cls, name in cases:
+                  print(f"- {'FAIL' if bad else 'PASS'} `{cls}` / `{name}`")
+          PY
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p staging
+          cp build/libs/*.jar staging/
+          ls -lh staging
+
+      - name: Upload jar as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # github.ref_name contains "/" on branches such as arena/..., which is
+          # not allowed in artifact names. The numeric run id is always safe.
+          name: starwright-${{ github.run_id }}
+          path: staging/*.jar
+          if-no-files-found: error
+
+      - name: Upload JUnit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-reports-${{ github.run_id }}
+          path: build/test-results/test/*.xml
+          if-no-files-found: warn
+
+      - name: Publish jar to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: staging/*.jar
+          generate_release_notes: true
+          draft: false
+          prerelease: false
