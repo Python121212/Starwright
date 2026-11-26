@@ -621,8 +621,10 @@ class StarwrightJarTest {
         String pool = new String(readClassBytes(
                         "io/github/python121212/starwright/ship/forge/ShipRegistry.class"),
                 StandardCharsets.ISO_8859_1);
-        assertTrue(pool.contains("CREATIVE_MODE_TAB"),
-                "the tab must be registered in the vanilla creative_mode_tab registry");
+        // reobfJar renames MC field names to SRG, so assert on the declaring
+        // class rather than the literal "CREATIVE_MODE_TAB" field name.
+        assertTrue(pool.contains("net/minecraft/core/registries/Registries"),
+                "the tab must be registered through the vanilla Registries key");
         assertTrue(pool.contains("CreativeModeTab"));
         assertTrue(pool.contains("itemGroup.starwright"),
                 "the tab must use the prepared translation key");
