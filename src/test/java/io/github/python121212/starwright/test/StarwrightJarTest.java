@@ -115,7 +115,7 @@ class StarwrightJarTest {
         assertEquals(1, mods.size());
         Toml mod = mods.get(0);
         assertEquals(MOD_ID, mod.getString("modId"));
-        assertEquals("1.1.0", mod.getString("version"));
+        assertEquals("1.1.1", mod.getString("version"));
         assertEquals("Starwright", mod.getString("displayName"));
         assertEquals("Python121212", mod.getString("authors"));
     }
@@ -150,7 +150,7 @@ class StarwrightJarTest {
             assertNotNull(jarFile.getManifest());
             var attributes = jarFile.getManifest().getMainAttributes();
             assertEquals("Starwright", attributes.getValue("Implementation-Title"));
-            assertEquals("1.1.0", attributes.getValue("Implementation-Version"));
+            assertEquals("1.1.1", attributes.getValue("Implementation-Version"));
             assertNotNull(attributes.getValue("Implementation-Timestamp"));
         }
     }
@@ -188,11 +188,23 @@ class StarwrightJarTest {
     }
 
     @Test
-    @DisplayName("FML injects the real Forge mod event bus")
-    void constructorReceivesForgeEventBus() {
-        assertEquals(List.of(EVENT_BUS), emulated.constructorParameterTypes(),
-                "Starwright should take the Forge mod event bus");
-        assertNotNull(emulated.instance(), "construction with the injected bus must succeed");
+    @DisplayName("Forge 1.20.1 FML can construct the mod via getDeclaredConstructor()")
+    void modHasFmlCompatibleNoArgConstructor() {
+        assertTrue(emulated.constructorParameterTypes().isEmpty(),
+                "FMLModContainer#constructMod() requires a no-arg constructor");
+        assertNotNull(emulated.instance(), "the no-arg constructor must run");
+    }
+
+    @Test
+    @DisplayName("no IEventBus constructor - that is exactly what broke real client loading")
+    void noEventBusConstructorCanReturn() throws Exception {
+        String pool = new String(readClassBytes(
+                        "io/github/python121212/starwright/Starwright.class"),
+                StandardCharsets.ISO_8859_1);
+        assertFalse(pool.contains("net/minecraftforge/eventbus/api/IEventBus"),
+                "Forge 1.20.1 never injects IEventBus into @Mod constructors");
+        assertFalse(pool.contains("FMLJavaModLoadingContext"),
+                "this mod intentionally uses the no-arg form");
     }
 
     @Test

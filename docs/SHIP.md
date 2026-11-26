@@ -103,7 +103,7 @@ Minecraft に返します。ブロックが実レベルに残っているため�
 
 - `ShipStructureRulesTest.java`（10 件）: 座標パック、BFS、上限、**接地拒否**、底面接触拒否、
   コア保護と不要ブロック除去、可視面、1 軸 1 ブロック、バニラ委譲
-- `StarwrightJarTest.java`（32 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
+- `StarwrightJarTest.java`（33 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
   **13 個の船クラスが jar に入っていること**、**エンジンが pure Java であること**、
   **`simibubi` / `createaeronautics` / `flywheel` が class・manifest・エントリ名のどこにも無いこと**、
   **モデル 3 個 / PNG 0 個**、**日本語・英語の表示名**、**本番 jar の船化エミュレーション**、

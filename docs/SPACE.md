@@ -229,7 +229,7 @@ Mixin は SRG 名をリテラルで書き `remap = false, require = 0` にした
 - `SpaceRenderRulesTest.java`（6 件）: 星の単調増加、空の青→黒、フォグ減衰、地上カット境界、
   星が暗さより遅れて現れること、範囲外/NaN のクランプ
 - `ShipStructureRulesTest.java`（10 件）: 船化の氾濫埋め・浮遊判定・コア保護・1 ブロック移動・バニラ委譲
-- `StarwrightJarTest.java`（32 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
+- `StarwrightJarTest.java`（33 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
   **本番 jar の連続昇降エミュレーション**、**ジャンプ入力が上昇を駆動すること**、
   **Access Transformer の内容**、**本番 jar のクリエ飛行が宇宙でも上昇を返すこと**、
   **本番 jar がサバイバル／アドベンチャーに飛行許可を与えること**、
@@ -239,5 +239,5 @@ Mixin は SRG 名をリテラルで書き `remap = false, require = 0` にした
   **本番 jar の船化エンジン**、**Create / Create Aeronautics 依存不在**、
   `SpaceAscentRules` と `SpaceRenderRules` が Minecraft 非依存であること、`ServerLevel` 参照が jar 全体に無いこと
 
-合計 **71 件**。`src/main` / `src/test` を触っているため、
+合計 **72 件**。`src/main` / `src/test` を触っているため、
 前回決めた CI の発火条件どおり **ビルド＋エミュレーションテストが必ず走ります**。
