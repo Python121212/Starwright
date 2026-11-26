@@ -45,7 +45,7 @@ gradlew / gradle/wrapper/                                     ... Gradle 8.1.1 w
 ```
 
 `build` 一発で **jar 生成とテストが一緒に**走ります。
-成果物は `build/libs/starwright-1.0.0.jar`（`reobfJar` 済みの本番用 jar）。
+成果物は `build/libs/starwright-1.1.0.jar`（`reobfJar` 済みの本番用 jar）。
 テストだけ実行したい場合は `./gradlew test`、開発環境で起動したい場合は `./gradlew runClient` / `./gradlew runServer` を使えます。
 
 ## Forge を使用したエミュレーション ＋ 擬似マイクラ
@@ -56,7 +56,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 | --- | --- |
 | **Forge（本物）** | テスト用 classpath の本物の `net.minecraftforge.fml.common.Mod`（Forge 47.2.0 の jar から class バイト列を読み、隔離ローダーに定義）。`src/mockmc` に Forge のスタブは**一切無い** |
 | **擬似マイクラ** | `src/mockmc/java` の `net.minecraft.*` / `com.mojang.logging.*` / `org.slf4j.*` のフェイク実装と、`MockMinecraft`（起動・ログ・mod 登録を記録する疑似ランタイム） |
-| **mod（本物）** | ビルド済み `build/libs/starwright-1.0.0.jar` を実際にロードしてコンストラクタを実行 |
+| **mod（本物）** | ビルド済み `build/libs/starwright-1.1.0.jar` を実際にロードしてコンストラクタを実行 |
 
 `src/mockmc` は **JDK のみを classpath にして独立コンパイル**されるため、本物の Minecraft / Forge クラスが紛れ込むことはありません。
 
@@ -87,7 +87,7 @@ Minecraft は**一切起動せず**に、**Forge は本物**、**Minecraft 側�
 | 項目 | 状態 |
 | --- | --- |
 | Forge 1.20.1 (47.2.0) / Gradle 8.1.1 / JDK 17 | ✅ ビルド定義済み |
-| 読み込みだけの jar → GitHub Releases | ✅ `v1.0.0` |
+| 初期版（読み込みだけ）→ 宇宙・船つき最新版 | ✅ `v1.0.0` → **`v1.1.0`** |
 | 実 Forge ＋ 擬似マイクラのエミュレーション | ✅ JUnit 71 件 |
 | CI の発火条件 | ✅ jar 入力／本題の変更のみ。ドキュメントのみは無発火 |
 | **mod イベントバスの注入** | ✅ `Starwright(IEventBus)` — FML が本物のバスを渡す |
@@ -187,11 +187,15 @@ jar はリポジトリにコミットしないため、「jar が更新された
 リリースを出す手順:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
-Actions の完了後、Releases に `starwright-1.0.0.jar` が添付されます。
+Actions の完了後、Releases に `starwright-1.1.0.jar` が添付されます。
+
+> **`v1.0.0` は初期の「読み込みだけ」版です。宇宙・船の機能は入っていません。**
+> 宇宙へ行くには **`v1.1.0`** 以降を使ってください:
+> `https://github.com/Python121212/Starwright/releases/download/v1.1.0/starwright-1.1.0.jar`
 
 ## バージョン
 
@@ -203,10 +207,11 @@ Actions の完了後、Releases に `starwright-1.0.0.jar` が添付されます
 | Gradle | 8.1.1 |
 | Java | 17 |
 | JUnit | 5.10.2 |
-| mod version | 1.0.0 |
+| mod version | 1.1.0 |
 
 ---
 
 > メモ: このセッションの作業ブランチは `arena/3d34603a-starwright` です。
-> ブランチ運用の制約上、`main` ブランチへは直接 push せず、このブランチ上の変更として積み上げます。
+> ブランチ運用の制約上、`main` ブランチへは直接 push せず、このブランチから
+> **`main` 宛の Pull Request を経由して反映**します。
 > 「main に設置」は `src/main` ソースセットを指すものとして解釈しています。

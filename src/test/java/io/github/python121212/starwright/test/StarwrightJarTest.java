@@ -115,7 +115,7 @@ class StarwrightJarTest {
         assertEquals(1, mods.size());
         Toml mod = mods.get(0);
         assertEquals(MOD_ID, mod.getString("modId"));
-        assertEquals("1.0.0", mod.getString("version"));
+        assertEquals("1.1.0", mod.getString("version"));
         assertEquals("Starwright", mod.getString("displayName"));
         assertEquals("Python121212", mod.getString("authors"));
     }
@@ -150,7 +150,7 @@ class StarwrightJarTest {
             assertNotNull(jarFile.getManifest());
             var attributes = jarFile.getManifest().getMainAttributes();
             assertEquals("Starwright", attributes.getValue("Implementation-Title"));
-            assertEquals("1.0.0", attributes.getValue("Implementation-Version"));
+            assertEquals("1.1.0", attributes.getValue("Implementation-Version"));
             assertNotNull(attributes.getValue("Implementation-Timestamp"));
         }
     }
