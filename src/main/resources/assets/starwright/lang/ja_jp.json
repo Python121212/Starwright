@@ -1,7 +1,10 @@
 {
   "itemGroup.starwright": "Starwright",
-  "block.starwright.core_block": "コアブロック",
-  "item.starwright.core_block": "コアブロック",
-  "item.starwright.wrench": "レンチ",
+  "block.starwright.physics_assembler": "物理アセンブラ",
+  "block.starwright.propeller_bearing": "プロペラ軸受",
+  "block.starwright.hot_air_burner": "熱気バーナー",
+  "block.starwright.steam_vent": "スチームベント",
+  "item.starwright.levitite": "レヴィタイト",
+  "item.starwright.aviators_goggles": "飛行士ゴーグル",
   "entity.starwright.ship": "船"
 }

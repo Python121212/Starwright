@@ -115,7 +115,7 @@ class StarwrightJarTest {
         assertEquals(1, mods.size());
         Toml mod = mods.get(0);
         assertEquals(MOD_ID, mod.getString("modId"));
-        assertEquals("1.1.2", mod.getString("version"));
+        assertEquals("1.2.0", mod.getString("version"));
         assertEquals("Starwright", mod.getString("displayName"));
         assertEquals("Python121212", mod.getString("authors"));
     }
@@ -150,7 +150,7 @@ class StarwrightJarTest {
             assertNotNull(jarFile.getManifest());
             var attributes = jarFile.getManifest().getMainAttributes();
             assertEquals("Starwright", attributes.getValue("Implementation-Title"));
-            assertEquals("1.1.2", attributes.getValue("Implementation-Version"));
+            assertEquals("1.2.0", attributes.getValue("Implementation-Version"));
             assertNotNull(attributes.getValue("Implementation-Timestamp"));
         }
     }
@@ -421,6 +421,8 @@ class StarwrightJarTest {
             assertFalse(entry.contains("FlightCapsule"), "no capsule entity: " + entry);
             assertFalse(entry.contains("ShipGuideScreen"), "no ship guide UI: " + entry);
             assertFalse(entry.contains("CoreScreen"), "no core UI: " + entry);
+            assertFalse(entry.contains("wrench"), "the wrench was removed: " + entry);
+            assertFalse(entry.contains("core_block"), "the core block was removed: " + entry);
             assertFalse(entry.startsWith("data/"), "no dimension overrides: " + entry);
         }
     }
@@ -484,14 +486,13 @@ class StarwrightJarTest {
         assertEquals(1, mixins, "only one mixin");
         for (String entry : emulated.entries()) {
             assertFalse(entry.endsWith(".refmap.json"), "no refmap: " + entry);
-            assertFalse(entry.endsWith(".png"), "no textures: " + entry);
             assertFalse(entry.contains("Screen.class"), "no UI: " + entry);
         }
-        assertEquals(3, emulated.entries().stream()
+        assertEquals(10, emulated.entries().stream()
                         .filter(entry -> entry.startsWith("assets/starwright/models/")
                                 && entry.endsWith(".json"))
                         .count(),
-                "only three tiny models, all reusing vanilla textures");
+                "ten tiny models; the star field still needs zero textures");
         String pool = new String(readClassBytes(
                         "io/github/python121212/starwright/space/SpaceRenderRules.class"),
                 StandardCharsets.ISO_8859_1);
@@ -511,8 +512,10 @@ class StarwrightJarTest {
                 "io/github/python121212/starwright/ship/ShipStructure.class",
                 "io/github/python121212/starwright/ship/ShipPhysics.class",
                 "io/github/python121212/starwright/ship/ShipInteractionRules.class",
-                "io/github/python121212/starwright/ship/forge/CoreBlock.class",
-                "io/github/python121212/starwright/ship/forge/WrenchItem.class",
+                "io/github/python121212/starwright/ship/forge/PhysicsAssemblerBlock.class",
+                "io/github/python121212/starwright/ship/forge/ShipControlBlock.class",
+                "io/github/python121212/starwright/ship/forge/LevititeItem.class",
+                "io/github/python121212/starwright/ship/forge/AviatorsGogglesItem.class",
                 "io/github/python121212/starwright/ship/forge/ShipEntity.class",
                 "io/github/python121212/starwright/ship/forge/ShipForgeBridge.class",
                 "io/github/python121212/starwright/ship/forge/ShipRegistry.class",
@@ -555,19 +558,28 @@ class StarwrightJarTest {
     }
 
     @Test
-    @DisplayName("ship models are minimal and reuse vanilla textures")
-    void shipModelsAreMinimal() throws Exception {
-        assertEquals(1, emulated.entries().stream()
+    @DisplayName("six original 16x16 textures replace the borrowed iron look")
+    void shipTexturesAreOriginal() throws Exception {
+        assertEquals(10, emulated.entries().stream()
+                .filter(entry -> entry.startsWith("assets/starwright/models/")
+                        && entry.endsWith(".json"))
+                .count(), "four blocks + six item models");
+        assertEquals(4, emulated.entries().stream()
                 .filter(entry -> entry.startsWith("assets/starwright/blockstates/")
                         && entry.endsWith(".json"))
                 .count());
+        assertEquals(6, emulated.entries().stream()
+                .filter(entry -> entry.startsWith("assets/starwright/textures/")
+                        && entry.endsWith(".png"))
+                .count(), "one original texture per object");
+        assertTrue(readEntry("assets/starwright/models/block/physics_assembler.json")
+                .contains("starwright:block/physics_assembler"));
+        assertTrue(readEntry("assets/starwright/models/item/aviators_goggles.json")
+                .contains("starwright:item/aviators_goggles"));
         for (String entry : emulated.entries()) {
-            assertFalse(entry.endsWith(".png"), "no new textures: " + entry);
+            assertFalse(entry.contains("iron_block") || entry.contains("iron_ingot"),
+                    "the borrowed vanilla iron look must be gone: " + entry);
         }
-        assertTrue(readEntry("assets/starwright/models/block/core_block.json")
-                .contains("minecraft:block/iron_block"));
-        assertTrue(readEntry("assets/starwright/models/item/wrench.json")
-                .contains("minecraft:item/iron_ingot"));
     }
 
     @Test
@@ -576,13 +588,21 @@ class StarwrightJarTest {
         for (String lang : List.of("en_us", "ja_jp")) {
             JsonObject json = JsonParser.parseString(
                     readEntry("assets/starwright/lang/" + lang + ".json")).getAsJsonObject();
-            assertTrue(json.has("block.starwright.core_block"));
-            assertTrue(json.has("item.starwright.wrench"));
-            assertTrue(json.has("entity.starwright.ship"));
+            for (String key : List.of(
+                    "block.starwright.physics_assembler",
+                    "block.starwright.propeller_bearing",
+                    "block.starwright.hot_air_burner",
+                    "block.starwright.steam_vent",
+                    "item.starwright.levitite",
+                    "item.starwright.aviators_goggles",
+                    "entity.starwright.ship")) {
+                assertTrue(json.has(key), lang + " missing " + key);
+                assertFalse(json.get(key).getAsString().isBlank());
+            }
         }
         String japanese = readEntry("assets/starwright/lang/ja_jp.json");
-        assertTrue(japanese.contains("コアブロック"));
-        assertTrue(japanese.contains("レンチ"));
+        assertTrue(japanese.contains("物理アセンブラ"));
+        assertTrue(japanese.contains("レヴィタイト"));
     }
 
     @Test
@@ -594,8 +614,9 @@ class StarwrightJarTest {
         assertEquals(6, ship.collected());
         assertTrue(ship.coreProtected(), "the core must never be wrenched off");
         assertTrue(ship.spareDetachable(), "extra blocks must be removable");
-        assertTrue(ship.wrenchDetach());
-        assertTrue(ship.wrenchAdvance());
+        assertTrue(ship.assemblerDetach());
+        assertTrue(ship.assemblerAdvance());
+        assertTrue(ship.controlAdvance());
         assertTrue(ship.chestPassthrough(),
                 "chests / walking / placing blocks stay vanilla");
         assertEquals(0, ship.stepX());
@@ -628,9 +649,11 @@ class StarwrightJarTest {
         assertTrue(pool.contains("CreativeModeTab"));
         assertTrue(pool.contains("itemGroup.starwright"),
                 "the tab must use the prepared translation key");
-        assertTrue(pool.contains("core_block"));
-        assertTrue(pool.contains("wrench"));
-        assertTrue(pool.contains("ItemStack"), "the wrench must be the tab icon");
+        assertTrue(pool.contains("physics_assembler"));
+        assertTrue(pool.contains("propeller_bearing"));
+        assertTrue(pool.contains("levitite"));
+        assertTrue(pool.contains("aviators_goggles"));
+        assertTrue(pool.contains("ItemStack"), "the assembler must be the tab icon");
     }
 
     @Test
@@ -641,6 +664,53 @@ class StarwrightJarTest {
                     readEntry("assets/starwright/lang/" + lang + ".json")).getAsJsonObject();
             assertTrue(json.has("itemGroup.starwright"));
             assertFalse(json.get("itemGroup.starwright").getAsString().isBlank());
+        }
+    }
+
+    @Test
+    @DisplayName("the wrench and the old core block are completely gone")
+    void wrenchAndCoreBlockAreGone() {
+        for (String entry : emulated.entries()) {
+            assertFalse(entry.contains("WrenchItem") || entry.contains("CoreBlock"),
+                    "old class still shipped: " + entry);
+            assertFalse(entry.contains("wrench") || entry.contains("core_block"),
+                    "old id still shipped: " + entry);
+        }
+        String toml = readEntrySilently("META-INF/mods.toml");
+        assertFalse(toml.contains("core_block"));
+    }
+
+    @Test
+    @DisplayName("all six Create-Aeronautics-inspired objects are packaged and localised")
+    void caStyleShipObjectsAreComplete() throws Exception {
+        List<String> ids = List.of("physics_assembler", "propeller_bearing",
+                "hot_air_burner", "steam_vent", "levitite", "aviators_goggles");
+        JsonObject en = JsonParser.parseString(
+                readEntry("assets/starwright/lang/en_us.json")).getAsJsonObject();
+        for (String id : ids) {
+            assertTrue(emulated.entries().contains(
+                            "assets/starwright/models/item/" + id + ".json"),
+                    "missing item model: " + id);
+            String key = (id.equals("levitite") || id.equals("aviators_goggles")
+                    ? "item." : "block.") + "starwright." + id;
+            assertTrue(en.has(key), "missing translation: " + key);
+        }
+        for (String block : List.of("physics_assembler", "propeller_bearing",
+                "hot_air_burner", "steam_vent")) {
+            assertTrue(emulated.entries().contains(
+                            "assets/starwright/models/block/" + block + ".json"),
+                    "missing block model: " + block);
+            assertTrue(emulated.entries().contains(
+                            "assets/starwright/textures/block/" + block + ".png"),
+                    "missing original texture: " + block);
+        }
+    }
+
+    private static String readEntrySilently(String name) {
+        try {
+            return readEntry(name);
+        } catch (IOException e) {
+            return "";
         }
     }
 }

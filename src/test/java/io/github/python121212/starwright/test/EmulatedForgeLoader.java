@@ -90,8 +90,9 @@ public final class EmulatedForgeLoader {
             int visibleFaces,
             boolean coreProtected,
             boolean spareDetachable,
-            boolean wrenchDetach,
-            boolean wrenchAdvance,
+            boolean assemblerDetach,
+            boolean assemblerAdvance,
+            boolean controlAdvance,
             boolean chestPassthrough,
             int stepX,
             int stepY,
@@ -397,12 +398,14 @@ public final class EmulatedForgeLoader {
                 long[].class, long.class, sourceIface);
         Method clampStep = physics.getMethod("clampStep",
                 int.class, int.class, int.class);
-        Method wrenchDetach = interaction.getMethod("isWrenchDetach",
-                boolean.class, boolean.class, boolean.class, boolean.class);
-        Method wrenchAdvance = interaction.getMethod("isWrenchAdvance",
+        Method assemblerDetach = interaction.getMethod("isAssemblerDetach",
                 boolean.class, boolean.class, boolean.class);
-        Method passthrough = interaction.getMethod("isVanillaPassthrough",
+        Method assemblerAdvance = interaction.getMethod("isAssemblerAdvance",
                 boolean.class, boolean.class);
+        Method controlAdvance = interaction.getMethod("isControlAdvance",
+                boolean.class);
+        Method passthrough = interaction.getMethod("isVanillaPassthrough",
+                boolean.class);
 
         long core = (long) pack.invoke(null, 0, 0, 0);
         Set<Long> floating = new HashSet<>();
@@ -430,9 +433,10 @@ public final class EmulatedForgeLoader {
         long spare = (long) pack.invoke(null, 2, 0, 0);
         boolean coreProtected = !(boolean) canDetach.invoke(null, hull, core, floatingSource);
         boolean spareDetachable = (boolean) canDetach.invoke(null, hull, spare, floatingSource);
-        boolean detach = (boolean) wrenchDetach.invoke(null, true, true, true, false);
-        boolean advance = (boolean) wrenchAdvance.invoke(null, false, true, true);
-        boolean chestStillVanilla = (boolean) passthrough.invoke(null, false, true);
+        boolean detach = (boolean) assemblerDetach.invoke(null, true, true, false);
+        boolean advance = (boolean) assemblerAdvance.invoke(null, false, true);
+        boolean control = (boolean) controlAdvance.invoke(null, true);
+        boolean chestStillVanilla = (boolean) passthrough.invoke(null, false);
         int[] step = (int[]) clampStep.invoke(null, 0, 0, 1);
         int maxBlocks = tuning.getField("MAX_BLOCKS").getInt(null);
         int minBlocks = tuning.getField("MIN_BLOCKS").getInt(null);
@@ -442,13 +446,15 @@ public final class EmulatedForgeLoader {
         recordShip.invoke(null, "groundedRejected=" + groundedRejected
                 + ",coreProtected=" + coreProtected
                 + ",spareDetachable=" + spareDetachable);
-        recordShip.invoke(null, "wrenchDetach=" + detach
-                + ",wrenchAdvance=" + advance
+        recordShip.invoke(null, "assemblerDetach=" + detach
+                + ",assemblerAdvance=" + advance
+                + ",controlAdvance=" + control
                 + ",chestPassthrough=" + chestStillVanilla);
 
         return new ShipEmulation(
                 hull.length, floats, groundedRejected, faces,
-                coreProtected, spareDetachable, detach, advance, chestStillVanilla,
+                coreProtected, spareDetachable, detach, advance, control,
+                chestStillVanilla,
                 step[0], step[1], step[2], maxBlocks, minBlocks);
     }
 

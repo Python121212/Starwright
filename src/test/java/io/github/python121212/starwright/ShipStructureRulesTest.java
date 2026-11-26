@@ -153,14 +153,16 @@ class ShipStructureRulesTest {
     }
 
     @Test
-    @DisplayName("wrench actions are explicit; everything else stays vanilla")
+    @DisplayName("assembler/control clicks are explicit; everything else stays vanilla")
     void interactionsFallThroughToVanilla() {
-        assertTrue(ShipInteractionRules.isWrenchDetach(true, true, true, false));
-        assertFalse(ShipInteractionRules.isWrenchDetach(true, true, true, true));
-        assertFalse(ShipInteractionRules.isWrenchDetach(false, true, true, false));
-        assertTrue(ShipInteractionRules.isWrenchAdvance(false, true, true));
-        assertFalse(ShipInteractionRules.isWrenchAdvance(true, true, true));
-        assertTrue(ShipInteractionRules.isVanillaPassthrough(false, true),
+        assertTrue(ShipInteractionRules.isAssemblerDetach(true, true, false));
+        assertFalse(ShipInteractionRules.isAssemblerDetach(true, true, true));
+        assertFalse(ShipInteractionRules.isAssemblerDetach(false, true, false));
+        assertTrue(ShipInteractionRules.isAssemblerAdvance(false, true));
+        assertFalse(ShipInteractionRules.isAssemblerAdvance(true, true));
+        assertTrue(ShipInteractionRules.isControlAdvance(true));
+        assertFalse(ShipInteractionRules.isControlAdvance(false));
+        assertTrue(ShipInteractionRules.isVanillaPassthrough(false),
                 "opening a chest must be handed straight back to Minecraft");
         assertTrue(ShipInteractionRules.coreIsProtected(true));
     }

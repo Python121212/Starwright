@@ -26,7 +26,7 @@ public final class ShipForgeBridge {
 
     private ShipForgeBridge() {}
 
-    /** Called when a core block is placed. Only a genuinely floating hull assembles. */
+    /** Called when the Physics Assembler is placed. Only a genuinely floating hull assembles. */
     public static void tryAssemble(Level level, BlockPos corePos) {
         if (level.isClientSide) {
             return;
@@ -58,7 +58,7 @@ public final class ShipForgeBridge {
                 ship.structure().originY(),
                 ship.structure().originZ()));
         if (!ShipStructureRules.canDetach(ship.structure().blocks(), relative, source)
-                || !ShipInteractionRules.isWrenchDetach(true, true, true, core)) {
+                || !ShipInteractionRules.isAssemblerDetach(true, true, core)) {
             return false;
         }
         ship.detach(relative);
