@@ -16,7 +16,7 @@ import net.minecraft.world.phys.BlockHitResult;
  * Starwright's own take on Create: Aeronautics' Physics Assembler.
  *
  * <p>Place it anywhere inside a self-built structure that is floating in the
- * air: the connected blocks become ONE {@link ShipEntity}. No wrench and no
+ * air: the connected blocks become ONE {@link ShipEntity}. No legacy tool, no
  * separate core block are needed - this block is both the assembly point and
  * the control point.</p>
  *

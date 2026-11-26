@@ -23,7 +23,7 @@ import net.minecraftforge.registries.RegisterEvent;
  * Registers the Create-Aeronautics-inspired (but entirely standalone) ship
  * blocks, items, entity and dedicated creative tab on the MOD bus.
  *
- * <p>The wrench and the old core block are GONE. A Physics Assembler assembles
+ * <p>The legacy tool and core are GONE. A Physics Assembler assembles
  * the structure, and Propeller Bearing / Hot Air Burner / Steam Vent move it.
  * Levitite and Aviator's Goggles are the two standalone items.</p>
  *

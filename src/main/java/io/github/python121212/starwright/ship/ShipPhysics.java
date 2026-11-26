@@ -5,7 +5,7 @@ package io.github.python121212.starwright.ship;
  *
  * <p>No velocity, no acceleration, no angular momentum, no collision solver,
  * no per-tick integration. Create Aeronautics runs a physics world every tick;
- * Starwright just relocates real blocks once per wrench click.</p>
+ * Starwright just relocates real blocks once per control click.</p>
  */
 public final class ShipPhysics {
 
