@@ -13,7 +13,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -143,8 +142,6 @@ public final class EmulatedForgeLoader {
         ForgeBackedLoader loader = new ForgeBackedLoader(mockmcRoots, jarPath, testLoader);
         try {
             Class<?> mockmc = loader.loadClass(MOCKMC_CLASS);
-            Method recordEventBus = mockmc.getMethod("recordEventBusCall", String.class);
-
             Class<?> modClass = loader.loadClass(MAIN_CLASS);
             var annotation = Arrays.stream(modClass.getAnnotations())
                     .filter(a -> a.annotationType().getName().equals(MOD_ANNOTATION))
@@ -154,31 +151,17 @@ public final class EmulatedForgeLoader {
             String modId = (String) annotation.annotationType()
                     .getMethod("value").invoke(annotation);
 
-            // FML 1.20.1 injects IEventBus into the mod constructor. Accept both
-            // the old no-arg form and the injected form so adding registration
-            // code later never breaks the emulator.
-            Constructor<?> ctor = Arrays.stream(modClass.getDeclaredConstructors())
-                    .filter(c -> c.getParameterCount() <= 1)
-                    .min(Comparator.comparingInt(Constructor::getParameterCount))
-                    .orElseThrow(() -> new AssertionError(
-                            "mod needs a no-arg or single-argument constructor"));
+            // Forge 1.20.1 FMLModContainer#constructMod() resolves
+            // getDeclaredConstructor(FMLJavaModLoadingContext.class), then falls
+            // back to getDeclaredConstructor(). ONLY the no-arg form is valid
+            // here. Accepting an IEventBus constructor used to let a broken jar
+            // pass CI and then crash a real client with
+            // NoSuchMethodException: Starwright.<init>(). Never allow it again.
+            Constructor<?> ctor = modClass.getDeclaredConstructor();
             List<String> paramTypes = Arrays.stream(ctor.getParameterTypes())
                     .map(Class::getName)
                     .toList();
-
-            Object[] args;
-            if (ctor.getParameterCount() == 0) {
-                args = new Object[0];
-            } else {
-                Class<?> busType = ctor.getParameterTypes()[0];
-                Object bus = Proxy.newProxyInstance(
-                        loader, new Class<?>[] { busType },
-                        (proxy, method, methodArgs) -> {
-                            recordEventBus.invoke(null, method.getName());
-                            return defaultValue(method.getReturnType());
-                        });
-                args = new Object[] { bus };
-            }
+            Object[] args = new Object[0];
 
             PrintStream original = System.out;
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -488,21 +471,6 @@ public final class EmulatedForgeLoader {
         if (!condition) {
             throw new AssertionError(message);
         }
-    }
-
-    private static Object defaultValue(Class<?> type) {
-        if (!type.isPrimitive()) {
-            return null;
-        }
-        if (type == boolean.class) return false;
-        if (type == char.class) return '\0';
-        if (type == byte.class) return (byte) 0;
-        if (type == short.class) return (short) 0;
-        if (type == int.class) return 0;
-        if (type == long.class) return 0L;
-        if (type == float.class) return 0f;
-        if (type == double.class) return 0d;
-        return null; // void
     }
 
     /** Reads the genuine Forge annotation bytes from the test classpath. */

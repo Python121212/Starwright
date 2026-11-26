@@ -3,10 +3,13 @@ package io.github.python121212.starwright.ship.forge;
 import io.github.python121212.starwright.ship.ShipStructure;
 import io.github.python121212.starwright.ship.ShipStructureRules;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import net.minecraftforge.network.NetworkHooks;
 
 /**
  * ONE entity owns the whole ship. It is deliberately almost empty: no model,
@@ -21,6 +24,15 @@ public final class ShipEntity extends Entity {
     public ShipEntity(EntityType<? extends ShipEntity> type, Level level) {
         super(type, level);
         this.noPhysics = true;
+    }
+
+    /**
+     * Forge 1.20.1 does NOT patch Entity#getAddEntityPacket, so a custom entity
+     * must use the Forge spawn packet or the client receives an unknown entity.
+     */
+    @Override
+    public Packet<ClientGamePacketListener> getAddEntityPacket() {
+        return NetworkHooks.getEntitySpawningPacket(this);
     }
 
     @Override
