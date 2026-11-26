@@ -115,7 +115,7 @@ class StarwrightJarTest {
         assertEquals(1, mods.size());
         Toml mod = mods.get(0);
         assertEquals(MOD_ID, mod.getString("modId"));
-        assertEquals("1.1.1", mod.getString("version"));
+        assertEquals("1.1.2", mod.getString("version"));
         assertEquals("Starwright", mod.getString("displayName"));
         assertEquals("Python121212", mod.getString("authors"));
     }
@@ -150,7 +150,7 @@ class StarwrightJarTest {
             assertNotNull(jarFile.getManifest());
             var attributes = jarFile.getManifest().getMainAttributes();
             assertEquals("Starwright", attributes.getValue("Implementation-Title"));
-            assertEquals("1.1.1", attributes.getValue("Implementation-Version"));
+            assertEquals("1.1.2", attributes.getValue("Implementation-Version"));
             assertNotNull(attributes.getValue("Implementation-Timestamp"));
         }
     }
@@ -613,5 +613,34 @@ class StarwrightJarTest {
                 .filter(event -> event.startsWith("ship:")).count());
         assertTrue(emulated.pseudoMinecraftEvents().stream()
                 .anyMatch(event -> event.contains("groundedRejected=true")));
+    }
+
+    @Test
+    @DisplayName("a dedicated Starwright creative tab lists the wrench and core block")
+    void starwrightCreativeTabIsRegistered() throws Exception {
+        String pool = new String(readClassBytes(
+                        "io/github/python121212/starwright/ship/forge/ShipRegistry.class"),
+                StandardCharsets.ISO_8859_1);
+        // reobfJar renames MC field names to SRG, so assert on the declaring
+        // class rather than the literal "CREATIVE_MODE_TAB" field name.
+        assertTrue(pool.contains("net/minecraft/core/registries/Registries"),
+                "the tab must be registered through the vanilla Registries key");
+        assertTrue(pool.contains("CreativeModeTab"));
+        assertTrue(pool.contains("itemGroup.starwright"),
+                "the tab must use the prepared translation key");
+        assertTrue(pool.contains("core_block"));
+        assertTrue(pool.contains("wrench"));
+        assertTrue(pool.contains("ItemStack"), "the wrench must be the tab icon");
+    }
+
+    @Test
+    @DisplayName("the dedicated tab has a non-empty title in both languages")
+    void creativeTabIsLocalised() throws Exception {
+        for (String lang : List.of("en_us", "ja_jp")) {
+            JsonObject json = JsonParser.parseString(
+                    readEntry("assets/starwright/lang/" + lang + ".json")).getAsJsonObject();
+            assertTrue(json.has("itemGroup.starwright"));
+            assertFalse(json.get("itemGroup.starwright").getAsString().isBlank());
+        }
     }
 }

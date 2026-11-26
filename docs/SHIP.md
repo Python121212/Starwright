@@ -10,12 +10,26 @@ MC **1.20.1 / Forge 47.x**、**単独 mod**。**Create / Create Aeronautics / fl
 | ブロック | `starwright:core_block` | `ship/forge/CoreBlock.java` |
 | アイテム | `starwright:wrench` | `ship/forge/WrenchItem.java` |
 | エンティティ | `starwright:ship` | `ship/forge/ShipEntity.java` |
+| クリエイティブタブ | `starwright:starwright` | `itemGroup.starwright` — レンチ＋コアブロック |
 | 登録 | `RegisterEvent`（MOD bus） | `ship/forge/ShipRegistry.java` |
 | クライアント | 描画しないレンダラ | `ship/forge/client/NoopShipRenderer.java` |
 
 モデルは `assets/starwright/models/**` の **3 個**、`blockstates` **1 個**。
 すべて `minecraft:block/iron_block` / `minecraft:item/iron_ingot` を親・テクスチャに再利用し、**PNG は 0 個**です。
 レシピ・`data/**`・画面・独自パケット・キー登録は追加していません。
+
+### 専用クリエイティブタブ
+
+`RegisterEvent` で **`Registries.CREATIVE_MODE_TAB`（バニラレジストリ）** に `starwright:starwright` を登録します。
+Forge 1.20.1 の `GameData#postRegisterEvents()` はバニラレジストリにも `RegisterEvent` を post するため、
+`DeferredRegister` や追加のイベントバスは不要です。
+
+- タイトル: `Component.translatable("itemGroup.starwright")`（`en_us` / `ja_jp` 両方に用意済み）
+- アイコン: **レンチ**
+- 中身: **コアブロック** → **レンチ** の 2 つだけ
+- アイテムは `ForgeRegistries.ITEMS.getValue(...)` で**タブ構築時に**解決するため、ITEMS と
+  CREATIVE_MODE_TAB の登録順序に依存せず、null を参照することもありません
+- サバイバル用のレシピ／`data/**` は引き続き追加していません（軽量化方針を維持）
 
 ## 使い方
 
@@ -103,10 +117,11 @@ Minecraft に返します。ブロックが実レベルに残っているため�
 
 - `ShipStructureRulesTest.java`（10 件）: 座標パック、BFS、上限、**接地拒否**、底面接触拒否、
   コア保護と不要ブロック除去、可視面、1 軸 1 ブロック、バニラ委譲
-- `StarwrightJarTest.java`（33 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
+- `StarwrightJarTest.java`（35 件）: 従来の jar／実 Forge／擬似 MC 検証に加え、
   **13 個の船クラスが jar に入っていること**、**エンジンが pure Java であること**、
   **`simibubi` / `createaeronautics` / `flywheel` が class・manifest・エントリ名のどこにも無いこと**、
-  **モデル 3 個 / PNG 0 個**、**日本語・英語の表示名**、**本番 jar の船化エミュレーション**、
+  **モデル 3 個 / PNG 0 個**、**日本語・英語の表示名**、**専用クリエイティブタブの登録と翻訳**、
+  **本番 jar の船化エミュレーション**、
   擬似マイクラの `ship:` 記録
 
 `src/main` / `src/test` を触っているため、選択的 CI の条件どおり
