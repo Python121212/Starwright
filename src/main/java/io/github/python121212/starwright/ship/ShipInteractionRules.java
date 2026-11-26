@@ -2,7 +2,7 @@ package io.github.python121212.starwright.ship;
 
 /**
  * Decides what a click on a ship block means - and, just as importantly, what
- * it does NOT mean. There is no wrench any more: the Physics Assembler and the
+ * it does NOT mean. There is no legacy tool: the Physics Assembler and the
  * three control blocks handle everything. Everything else falls through to
  * vanilla, which is why placing blocks, walking and opening chests keep working.
  */

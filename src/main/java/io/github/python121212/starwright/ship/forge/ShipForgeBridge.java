@@ -42,7 +42,7 @@ public final class ShipForgeBridge {
         level.addFreshEntity(ship);
     }
 
-    /** Shift + wrench: remove one accidentally attached block and drop it. */
+    /** Shift + use: remove one accidentally attached block and drop it. */
     public static boolean detach(Level level, BlockPos pos) {
         if (level.isClientSide) {
             return false;
@@ -66,7 +66,7 @@ public final class ShipForgeBridge {
         return true;
     }
 
-    /** Plain wrench click: one block of travel, with containers carried along. */
+    /** Plain use click: one block of travel, with containers carried along. */
     public static boolean advance(Level level, BlockPos pos, Direction direction) {
         if (level.isClientSide) {
             return false;

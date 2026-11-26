@@ -503,7 +503,7 @@ class StarwrightJarTest {
     }
 
     @Test
-    @DisplayName("core block, wrench and ship entity are shipped in the jar")
+    @DisplayName("all six CA-inspired objects and the ship engine are shipped in the jar")
     void shipContentIsPackaged() {
         for (String name : List.of(
                 "io/github/python121212/starwright/ship/ShipTuning.class",
@@ -583,7 +583,7 @@ class StarwrightJarTest {
     }
 
     @Test
-    @DisplayName("localisation names the core block, wrench and ship")
+    @DisplayName("localisation names all six objects and the ship")
     void shipNamesAreLocalised() throws Exception {
         for (String lang : List.of("en_us", "ja_jp")) {
             JsonObject json = JsonParser.parseString(
@@ -612,7 +612,7 @@ class StarwrightJarTest {
         assertTrue(ship.floating(), "an airborne hull must assemble");
         assertTrue(ship.groundedRejected(), "a grounded hull must be refused");
         assertEquals(6, ship.collected());
-        assertTrue(ship.coreProtected(), "the core must never be wrenched off");
+        assertTrue(ship.coreProtected(), "the assembler must never be detached");
         assertTrue(ship.spareDetachable(), "extra blocks must be removable");
         assertTrue(ship.assemblerDetach());
         assertTrue(ship.assemblerAdvance());
@@ -637,7 +637,7 @@ class StarwrightJarTest {
     }
 
     @Test
-    @DisplayName("a dedicated Starwright creative tab lists the wrench and core block")
+    @DisplayName("a dedicated Starwright creative tab lists all six objects")
     void starwrightCreativeTabIsRegistered() throws Exception {
         String pool = new String(readClassBytes(
                         "io/github/python121212/starwright/ship/forge/ShipRegistry.class"),

@@ -59,7 +59,7 @@ public final class MockMinecraft {
 
     /**
      * Records one emulated ship-engine decision made by the production jar's
-     * pure rules (flood fill, floating check, wrench action).
+     * pure rules (flood fill, floating check, control action).
      */
     public static void recordShip(String decision) {
         EVENTS.add("ship:" + decision);
